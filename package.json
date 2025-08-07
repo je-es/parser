@@ -1,0 +1,47 @@
+{
+	"name": "@je-es/parser",
+	"version": "0.0.0",
+	"description": "Advanced syntax analyzer that converts tokens into AST with customizable grammar rules and intelligent error detection.",
+	"keywords": [
+		"je-es",
+		"syntax",
+		"parser",
+		"lint",
+		"tool"
+	],
+	"license": "MIT",
+	"main": "./dist/parser.js",
+	"module": "./dist/parser.mjs",
+	"types": "./dist/parser.d.ts",
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"test": "tsup && jest",
+		"build": "tsup",
+		"app": "tsup && node ./dist/parser.js"
+	},
+	"author": {
+		"name": "Maysara Elshewehy",
+		"email": "maysara.elshewehy@gmail.com",
+		"url": "https://github.com/maysara-elshewehy"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/je-es/parser.git"
+	},
+	"bugs": {
+		"url": "https://github.com/je-es/parser/issues"
+	},
+	"homepage": "https://github.com/je-es/parser#readme",
+	"devDependencies": {
+		"@je-es/lexer": "^0.0.5",
+		"@types/jest": "^29.5.12",
+		"@types/node": "^20.12.7",
+		"jest": "^29.7.0",
+		"ts-jest": "^29.1.2",
+		"ts-node": "^10.9.2",
+		"tsup": "^8.0.2",
+		"typescript": "^5.4.5"
+	}
+}
