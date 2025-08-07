@@ -644,7 +644,7 @@ import * as parser from '@je-es/parser';
       > Advanced syntax analyzer that converts tokens into AST with customizable grammar rules and intelligent error detection.
 
   - ##### [@je-es/syntax](https://github.com/je-es/syntax)
-      > Unified interface for creating custom language modes with simplified lexing and parsing capabilities.
+      > Unified wrapper that streamlines syntax creation with integrated lexer-parser coordination, LSP support, and enhanced linting capabilities.
 
 <br>
 <div align="center">
