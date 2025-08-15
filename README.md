@@ -53,16 +53,14 @@ import * as parser from '@je-es/parser';
         // Root rule - entry point
         parser.createRule('root',
             // `(..), (..), ..`
-            parser.repeat(
+            parser.oneOrMore(           // Shortcut for parser.repeat(..)
                 parser.rule('group'),
-                1,                     // At least one group
-                Infinity,              // No upper limit
-                parser.token('comma')  // Separated by commas
+                parser.token('comma')   // Separated by commas
             ),
             {
                 build: (matches) => ({
-                    type: 'root',
-                    groups: matches.map(m => m.meta)
+                    rule: 'root',
+                    groups: matches.map(m => m.data)
                 })
             }
         ),
@@ -83,8 +81,8 @@ import * as parser from '@je-es/parser';
             ),
             {
                 build: (matches) => ({
-                    type: 'group',
-                    meta: {
+                    rule: 'group',
+                    data: {
                         left        : matches[1].value,
                         operator    : matches[2].value,
                         right       : matches[3].value
@@ -92,38 +90,11 @@ import * as parser from '@je-es/parser';
                 }),
 
                 errors: [
-                    parser.error(
-                        // condition
-                        (parser, failedAt) => failedAt == 0,
-                        // message
-                        "Missing opening parenthesis '('",
-                        // suggestions
-                        ["Add '(' to close the group", "Check for balanced parentheses"]
-                    ),
-
-                    parser.error(
-                        (parser, failedAt) => failedAt == 1,
-                        "Missing left operand",
-                        ["Add a number to the left of the operator"]
-                    ),
-
-                    parser.error(
-                        (parser, failedAt) => failedAt == 2,
-                        "Missing operator",
-                        ["Add '+' or '-' operator to the expression"]
-                    ),
-
-                    parser.error(
-                        (parser, failedAt) => failedAt == 3,
-                        "Missing right operand",
-                        ["Add a number to the right of the operator"]
-                    ),
-
-                    parser.error(
-                        (parser, failedAt) => failedAt == 4,
-                        "Missing closing parenthesis ')'",
-                        ["Add ')' to close the group", "Check for balanced parentheses"]
-                    ),
+                    parser.error(0, "Expected opening parenthesis '('" ),
+                    parser.error(1, "Expected left operand", ),
+                    parser.error(2, "Expected operator", ),
+                    parser.error(3, "Expected right operand", ),
+                    parser.error(4, "Expected closing parenthesis ')'", ),
                 ],
 
                 // Example: `(+2... (3+4)`
@@ -134,7 +105,9 @@ import * as parser from '@je-es/parser';
                 //
                 // Note: In `resilient` mode, the parser halts at the first `(`,
                 // capturing a single error before returning.
-                recovery: parser.errorRecoveryStrategies.skipUntil('open')
+                recovery: parser.errorRecoveryStrategies.skipUntil('open'),
+
+                ...
             }
         ),
     ];
@@ -145,21 +118,19 @@ import * as parser from '@je-es/parser';
     ```typescript
     const parserSettings: parser.ParserSettings = {
         // Entry rule - where parsing begins
-        startRule: 'root',
+        startRule               : 'root',
 
         // Error recovery mode
-        errorRecovery: {
-            mode: 'resilient',          // 'strict' | 'resilient'
-            maxErrors: 0,               // Stop after N errors (0 = unlimited)
-            syncTokens: ['open']        // Tokens to sync on during recovery
+        errorRecovery           : {
+            mode                : 'resilient',      // 'strict' | 'resilient'
+            maxErrors           : 0,                // Stop after N errors (0 = unlimited)
+            syncTokens          : ['open']          // Tokens to sync on during recovery
         },
 
-        ignored: ['ws'],                // Ignore whitespace tokens
-        debug: false,                   // Enable debug mode (prints debug info)
-        maxDepth: 1000,                 // Maximum recursion depth (0 = unlimited)
-        enableMemoization: true,        // Enable memoization for better performance
-        maxCacheSize: 1000,             // Maximum cache size (0 = unlimited)
-        enableProfiling: false          // Enable profiling and statistics
+        ignored                 : ['ws'],           // Ignore whitespace tokens
+        debug                   : 'off',            // Disable debug mode
+        maxDepth                : 1000,             // Maximum recursion depth (0 = unlimited)
+        maxCacheSize            : 1000,             // Maximum cache size (0 = unlimited)
     };
     ```
 
@@ -168,8 +139,8 @@ import * as parser from '@je-es/parser';
     - #### Parse Valid Input
 
         ```typescript
-        const result1 = parser.parse(tokens_of_'(1+2)', rules, parserSettings);
-        console.log(result1);
+        const res = parser.parse(tokens_of_'(1+2)', rules, parserSettings);
+        console.log(res);
         ```
 
         ```jsonc
@@ -177,7 +148,7 @@ import * as parser from '@je-es/parser';
         {
             "ast": [
                 {
-                    "type": "root",
+                    "rule": "root",
                     "groups": [
                         { "left": "1", "operator": "+", "right": "2" }
                     ]
@@ -190,99 +161,83 @@ import * as parser from '@je-es/parser';
     - #### Parse Multiple Groups
 
         ```typescript
-        const result2 = parser.parse(tokens_of_'(1+2), (3-4), (5+6)', rules, parserSettings);
-        console.log(result2.ast[0].groups);
+        const res = parser.parse(tokens_of_'(1+2), (3-4), (5+6)', rules, parserSettings);
+        console.log(res.ast[0].groups);
         ```
 
         ```jsonc
         // Output
-        [
-            { "left": "1", "operator": "+", "right": "2" },
-            { "left": "3", "operator": "-", "right": "4" },
-            { "left": "5", "operator": "+", "right": "6" }
-        ]
+        {
+            "ast": [
+                {
+                    "rule": "root",
+                    "groups": [
+                        { "left": "1", "operator": "+", "right": "2" },
+                        { "left": "3", "operator": "-", "right": "4" },
+                        { "left": "5", "operator": "+", "right": "6" }
+                    ]
+                }
+            ],
+            "errors": []
+        }
         ```
 
     - #### Handle Errors Gracefully
 
         ```typescript
-        const result3 = parser.parse(tokens_of_'(1+2', rules, parserSettings);
-        console.log(result3.errors);
+        const res = parser.parse(tokens_of_'(1+2', rules, parserSettings);
+        console.log(res.errors);
         ```
 
         ```jsonc
         // Output
-        [
-            {
-                "code": "E006",
-                "context": " open:(  num:1  plus:+  num:2",
-                "message": "Missing closing parenthesis ')'",
-                "position": {
-                    "col": 5,
-                    "line": 1,
-                    "offset": 4,
+        {
+            "ast": [],
+            "errors":[
+                {
+                    "code"    : 0x007,
+                    "msg"     : "Expected closing parenthesis ')'",
+                    "range"   : { "start": { "line": 1, "col": 4, "offset": 3 }, "end": { "line": 1, "col": 5, "offset": 4 } }
                 },
-                "severity": "error",
-                "suggestions": [
-                    "Add ')' to close the group",
-                    "Check for balanced parentheses",
-                ],
-            }
-        ]
+                {
+                    "code"    : 0x005,
+                    "msg"     : "Expected at least 1 occurrences, got 0",
+                    "range"   : { "start": { "line": 1, "col": 4, "offset": 3 }, "end": { "line": 1, "col": 5, "offset": 4 } }
+                },
+            ]
+        }
         ```
 
     - #### Error Recovery Example
 
         ```typescript
-        const result4 = parser.parse(tokens_of_'(+2, (3+4)', rules, {
-            ...parserSettings,
-            errorRecovery: {
-                mode: 'resilient',      // Use resilient mode to continue after errors
-                maxErrors: 10,          // Allow up to 10 errors
-                syncTokens: ['open']    // Sync on open parenthesis
-            }
-        });
-        console.log(result4.ast[0].groups);
+        const res = parser.parse(tokens_of_'(+2), (3+4)', rules, parserSettings);
+        console.log(res.ast[0].groups);
         ```
 
         ```jsonc
         // Output - Successfully parsed the second group despite error in first
-        [
-            { "left": "3", "operator": "+", "right": "4" }
-        ]
-        ```
+        {
+            "ast": [
+            {
+                    "rule": "root",
+                    "groups": [
+                        { "left": "3", "operator": "+", "right": "4" }
+                    ]
+                }
+            ],
+            "errors": [
+                {
+                    "code"          : 0x007,
+                    "message"       : "Expected left operand",
+                    "range"         : { "start": { "line": 1, "col": 1, "offset": 0 }, "end": { "line": 1, "col": 2, "offset": 1 } }
 
-4. ### Advanced Usage
-
-    - #### Create Reusable Parser Instance
-
-        ```typescript
-        const myParser = parser.createParser(rules, parserSettings);
-
-        // Parse multiple inputs with the same parser
-        const result1 = myParser.parse(tokens1);
-        const result2 = myParser.parse(tokens2);
-
-        // Get cache statistics
-        const cacheStats = myParser.getCacheStats();
-        console.log(`Cache hit rate: ${(cacheStats.hitRate * 100).toFixed(2)}%`);
-
-        // Clear caches periodically for long-running applications
-        myParser.clearCaches();
-
-        // Dispose when done
-        myParser.dispose();
-        ```
-
-        #### Validate Grammar
-        ```typescript
-        const issues = parser.validateGrammar(rules, 'root');
-        if (issues.length > 0) {
-            console.error('Grammar validation failed:', issues);
+                }
+            ]
         }
         ```
 
-5. ### Next Steps
+4. ### Next Steps
 
     > For the next steps, please see the [`@je-es/syntax`](https://github.com/je-es/syntax) package.
 
@@ -291,342 +246,7 @@ import * as parser from '@je-es/parser';
 
 ## 📖 API Reference
 
-- ### Pattern Combinators
-
-    - #### `parser.createRule(name, pattern, options)`
-
-        > Create a custom parser rule with optional build function, error handlers, and recovery strategies.
-
-        ```typescript
-        parser.createRule('expression',
-            parser.seq(
-                parser.token('('),
-                parser.choice(
-                    parser.token('true'),
-                    parser.token('false'),
-                    parser.rule('variable')
-                ),
-                parser.token(')')
-            ),
-            {
-                build: (matches) => ({
-                    type: 'expression',
-                    value: matches[1].value
-                }),
-                errors: [
-                    parser.error(
-                        (parser, failedAt) => failedAt === 0,
-                        "Expected opening parenthesis",
-                        ["Add '(' before the expression"]
-                    )
-                ],
-                recovery: parser.errorRecoveryStrategies.skipUntil(')')
-            }
-        );
-        ```
-
-    - #### `parser.token(name)`
-
-        > Match a specific token by name.
-
-        ```typescript
-        parser.token('identifier')  // matches identifier tokens
-        parser.token('(')           // matches literal '(' tokens
-        ```
-
-    - #### `parser.rule(name)`
-
-        > Reference another parser rule.
-
-        ```typescript
-        parser.rule('expression')   // references the 'expression' rule
-        ```
-
-    - #### `parser.seq(...patterns)`
-
-        > Match a sequence of patterns in order.
-
-        ```typescript
-        parser.seq(
-            parser.token('if'),
-            parser.rule('condition'),
-            parser.token('then'),
-            parser.rule('statement')
-        )
-        ```
-
-    - #### `parser.choice(...patterns)`
-
-        > Match one of multiple alternative patterns.
-
-        ```typescript
-        parser.choice(
-            parser.token('true'),
-            parser.token('false'),
-            parser.rule('variable')
-        )
-        ```
-
-    - #### `parser.repeat(pattern, min?, max?, separator?)`
-
-        > Repeat a pattern with optional constraints and separator.
-
-        ```typescript
-        // Zero or more
-        parser.repeat(parser.rule('statement'))
-
-        // One or more
-        parser.repeat(parser.rule('parameter'), 1)
-
-        // Exactly 3
-        parser.repeat(parser.token('digit'), 3, 3)
-
-        // Comma-separated list
-        parser.repeat(
-            parser.rule('argument'),
-            0,
-            Infinity,
-            parser.token(',')
-        )
-        ```
-
-    - #### `parser.optional(pattern)`
-
-        > Make a pattern optional (equivalent to `repeat(pattern, 0, 1)`).
-
-        ```typescript
-        parser.optional(parser.token('?'))  // optional question mark
-        ```
-
-    - #### `parser.oneOrMore(pattern, separator?)`
-
-        > Match one or more occurrences of a pattern.
-
-        ```typescript
-        parser.oneOrMore(parser.rule('digit'))                    // 1+
-        parser.oneOrMore(parser.rule('param'), parser.token(',')) // comma-separated, 1+
-        ```
-
-    - #### `parser.zeroOrMore(pattern, separator?)`
-
-        > Match zero or more occurrences of a pattern.
-
-        ```typescript
-        parser.zeroOrMore(parser.rule('statement'))               // 0+
-        parser.zeroOrMore(parser.rule('item'), parser.token(';')) // semicolon-separated, 0+
-        ```
-
-<br>
-<div align="center">
-    <img src="./assets/img/line.png" alt="line" style="display: block; margin-top:20px;margin-bottom:20px;width:500px;"/>
-</div>
-
-- ### Error Handling
-
-    - #### `parser.error(condition, message, suggestions?, code?, severity?)`
-
-        > Create an error handler for rules.
-
-        ```typescript
-        parser.error(
-            (parser, failedAt) => failedAt === 2,
-            "Missing operator",
-            ["Add '+' or '-' operator", "Check expression syntax"],
-            "E001",
-            "error"
-        )
-        ```
-
-    - #### Error Recovery Strategies
-
-        - ##### `parser.errorRecoveryStrategies.panicMode()`
-
-            > Skip tokens until reaching a synchronization point.
-
-            ```typescript
-            recovery: parser.errorRecoveryStrategies.panicMode()
-            ```
-
-        - ##### `parser.errorRecoveryStrategies.skipUntil(tokens)`
-
-            > Skip tokens until finding one of the specified tokens.
-
-            ```typescript
-            recovery: parser.errorRecoveryStrategies.skipUntil([';', '}', 'end'])
-            recovery: parser.errorRecoveryStrategies.skipUntil('open') // single token
-            ```
-
-        - ##### `parser.errorRecoveryStrategies.insertToken(token, value?)`
-
-            > Virtual token insertion (doesn't modify token stream).
-
-            ```typescript
-            recovery: parser.errorRecoveryStrategies.insertToken(';', ';')
-            ```
-
-        - ##### `parser.errorRecoveryStrategies.deleteToken()`
-
-            > Skip the current token.
-
-            ```typescript
-            recovery: parser.errorRecoveryStrategies.deleteToken()
-            ```
-
-<br>
-<div align="center">
-    <img src="./assets/img/line.png" alt="line" style="display: block; margin-top:20px;margin-bottom:20px;width:500px;"/>
-</div>
-
-- ### Context Conditions
-
-    - #### `parser.contextConditions.missingToken(tokenName)`
-
-        > Detect when a specific token is missing.
-
-    - #### `parser.contextConditions.unexpectedToken(tokenName?)`
-
-        > Detect when an unexpected token appears.
-
-    - #### `parser.contextConditions.prematureEnd()`
-
-        > Detect when input ends unexpectedly.
-
-    - #### `parser.contextConditions.custom(predicate)`
-
-        > Create custom condition based on parser state.
-
-        ```typescript
-        parser.contextConditions.custom((parser, failedAt) => {
-            // Custom logic here
-            return failedAt > 0 && someCondition();
-        })
-        ```
-
-<br>
-<div align="center">
-    <img src="./assets/img/line.png" alt="line" style="display: block; margin-top:20px;margin-bottom:20px;width:500px;"/>
-</div>
-
-- ### Main Functions
-
-    - #### `parser.parse(tokens, rules, settings?)`
-
-        > Parse tokens using the provided rules and settings.
-
-        ```typescript
-        const result = parser.parse(tokens, rules, {
-            startRule: 'expression',
-            errorRecovery: { mode: 'resilient', maxErrors: 5, syncTokens: [] },
-            ignored: ['ws', 'comment'],
-            debug: false,
-            maxDepth: 1000,
-            enableMemoization: true,
-            maxCacheSize: 1000,
-            enableProfiling: false
-        });
-        ```
-
-    - #### `parser.createParser(rules, settings?)`
-
-        > Create a reusable parser instance.
-
-        ```typescript
-        const myParser = parser.createParser(rules, settings);
-        const result = myParser.parse(tokens);
-        ```
-
-    - #### `parser.validateGrammar(rules, startRule?)`
-
-        > Validate grammar rules without creating a parser.
-
-        ```typescript
-        const issues = parser.validateGrammar(rules, 'root');
-        if (issues.length === 0) {
-            console.log('Grammar is valid!');
-        }
-        ```
-
-<br>
-<div align="center">
-    <img src="./assets/img/line.png" alt="line" style="display: block; margin-top:20px;margin-bottom:20px;width:500px;"/>
-</div>
-
-- ### Parser Instance Methods
-
-    - #### `parser.parse(tokens)`
-
-        > Parse tokens using the parser instance.
-
-    - #### `parser.clearCaches()`
-
-        > Clear internal caches and reset parser state.
-
-    - #### `parser.getCacheStats()`
-
-        > Get current cache statistics.
-
-        ```typescript
-        const stats = myParser.getCacheStats();
-        // { size: 150, hitRate: 0.85 }
-        ```
-
-    - #### `parser.dispose()`
-
-        > Dispose of the parser and free resources.
-
-<br>
-<div align="center">
-    <img src="./assets/img/line.png" alt="line" style="display: block; margin-top:20px;margin-bottom:20px;width:500px;"/>
-</div>
-
-- ### Configuration
-
-    - #### ParserSettings Interface
-
-        ```typescript
-        interface ParserSettings {
-            startRule: string;                          // Entry rule name
-            errorRecovery: {
-                mode: 'strict' | 'resilient';          // Error recovery mode
-                maxErrors: number;                      // Max errors before stopping (0 = unlimited)
-                syncTokens: string[];                   // Synchronization tokens
-            };
-            ignored: string[];                          // Tokens to ignore (e.g., whitespace)
-            debug: boolean;                             // Enable debug output
-            maxDepth: number;                           // Max recursion depth (0 = unlimited)
-            enableMemoization: boolean;                 // Enable result caching
-            maxCacheSize: number;                       // Max cache entries (0 = unlimited)
-            enableProfiling: boolean;                   // Enable performance profiling
-        }
-        ```
-
-    - #### Error Recovery Modes
-
-        - **`strict`**: Stop parsing on first error, return immediately
-        - **`resilient`**: Continue parsing after errors, collect all errors, attempt recovery
-
-    - #### Parse Result
-
-        ```typescript
-        interface ParseResult {
-            ast: AstNode[];                             // Generated Abstract Syntax Tree
-            errors: ParseError[];                       // Parsing errors encountered
-            statistics?: ParseStatistics;               // Performance statistics (if profiling enabled)
-        }
-        ```
-
-    - #### Parse Statistics
-
-        ```typescript
-        interface ParseStatistics {
-            tokensProcessed: number;                    // Number of tokens processed
-            rulesApplied: number;                       // Number of rules applied
-            errorsRecovered: number;                    // Number of errors recovered from
-            parseTimeMs: number;                        // Total parsing time in milliseconds
-            memoryUsedKB?: number;                      // Estimated memory usage in KB
-            cacheHitRate?: number;                      // Cache hit rate (0.0 to 1.0)
-        }
-        ```
+> TODO
 
 <br>
 <div align="center">
