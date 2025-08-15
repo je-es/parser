@@ -112,6 +112,11 @@
 
 // ╔═══════════════════════════════════════════ CORE ════════════════════════════════════════════╗
 
+    /**
+     * Parser class for advanced syntax analysis.
+     * Parses tokens into AST with customizable grammar rules and intelligent error detection.
+     * @class
+    */
     export class Parser {
 
         // ┌─────────────────────────────── DATA ───────────────────────────────┐
@@ -188,6 +193,13 @@
 
         // ┌─────────────────────────────── MAIN ───────────────────────────────┐
 
+            /**
+             * Parses the given tokens using the defined rules and returns the AST and errors.
+             *
+             * @param {Token[]} tokens - The tokens to parse.
+             *
+             * @return {ParseResult} The AST and errors generated during parsing.
+            */
             parse(tokens: Token[]): ParseResult {
                 // Before
                 {
@@ -778,9 +790,6 @@
 
         // ┌─────────────────────────────── SILENT MODE ───────────────────────────────┐
 
-            /**
-             * Determines if a pattern should be parsed in silent mode
-             */
             private shouldBeSilent(pattern: Pattern, rule?: Rule): boolean {
                 // Rule-level silent mode takes precedence
                 if (rule?.options?.silent === true) {
@@ -800,9 +809,6 @@
                 return false;
             }
 
-            /**
-             * Checks if we're currently in silent parsing mode
-             */
             private isInSilentMode(): boolean {
                 return this.silentContextStack.length > 0 &&
                        this.silentContextStack[this.silentContextStack.length - 1];
@@ -1209,52 +1215,52 @@
             private cleanMemoCache(): void {
                 const entries = Array.from(this.memoCache.entries());
                 const now = Date.now();
-                
+
                 // Remove old entries and invalid ones
                 const validEntries = entries.filter(([key, value]) => {
                     // Remove entries older than 1 second (adjust as needed)
                     if (now - (value.cachedAt || 0) > 1000) {
                         return false;
                     }
-                    
+
                     // Remove entries that don't match current parsing context
                     if (value.errorCount !== this.errors.length) {
                         return false;
                     }
-                    
+
                     return true;
                 });
-                
+
                 // Keep only half of the valid entries (LRU-like)
                 const keepCount = Math.floor(validEntries.length / 2);
-                
+
                 this.memoCache.clear();
-                
+
                 // Keep the more recent entries
                 for (let i = validEntries.length - keepCount; i < validEntries.length; i++) {
                     this.memoCache.set(validEntries[i][0], validEntries[i][1]);
                 }
-                
+
                 this.log('verbose', `🧹 Memo cache cleaned: kept ${keepCount} of ${entries.length} entries`);
             }
 
             private createMemoKey(patternType: string, patternData: any, position: number, ruleName?: string): string {
                 // Include silent context in key
                 const silentContext = this.isInSilentMode() ? 'S' : 'L'; // S=Silent, L=Loud
-                
+
                 // Include error recovery state (simplified)
                 const errorContext = this.errors.length > 0 ? `E${this.errors.length}` : 'E0';
-                
+
                 // Create base key with context
                 const baseKey = `${patternType}:${position}:${silentContext}:${errorContext}`;
-                
+
                 if (ruleName) {
                     // For rules, include rule-specific context
                     const rule = this.rules.get(ruleName);
                     const ruleContext = this.getRuleContext(rule);
                     return `rule:${ruleName}:${ruleContext}:${baseKey}`;
                 }
-                
+
                 // For patterns, include pattern-specific data
                 switch (patternType) {
                     case 'token':
@@ -1273,13 +1279,13 @@
 
             private getRuleContext(rule?: Rule): string {
                 if (!rule) return 'none';
-                
+
                 // Create a simple hash of rule characteristics that affect parsing
                 const hasBuilder = rule.options?.build ? 'B' : '';
                 const hasErrors = rule.options?.errors?.length ? 'E' : '';
                 const hasRecovery = rule.options?.recovery ? 'R' : '';
                 const isSilent = rule.options?.silent ? 'S' : '';
-                
+
                 return `${hasBuilder}${hasErrors}${hasRecovery}${isSilent}`;
             }
 
@@ -1292,7 +1298,7 @@
                 if (!this.settings.maxCacheSize || this.memoCache.size >= this.settings.maxCacheSize) {
                     return { hit: false };
                 }
-                
+
                 const cached = this.memoCache.get(key);
                 if (cached !== undefined) {
                     // Additional validation: ensure the cached result is still valid
@@ -1306,7 +1312,7 @@
                         this.log('verbose', `🗑️ Memo INVALID: ${key}`);
                     }
                 }
-                
+
                 this.memoMisses++;
                 return { hit: false };
             }
@@ -1316,12 +1322,12 @@
                 if (typeof cached.newIndex !== 'number' || cached.newIndex < 0) {
                     return false;
                 }
-                
+
                 // Don't use cached results that would go beyond current token length
                 if (cached.newIndex > this.tokens.length) {
                     return false;
                 }
-                
+
                 // Additional checks can be added here based on your specific needs
                 return true;
             }
@@ -1330,26 +1336,26 @@
                 if (!this.settings.maxCacheSize || this.memoCache.size >= this.settings.maxCacheSize) {
                     return;
                 }
-                
+
                 // Don't memoize results that made no progress and failed
                 // This prevents caching failed attempts that might succeed later
                 if (result === null && startIndex === endIndex) {
                     this.log('verbose', `⚠️ Skip memo (no progress): ${key}`);
                     return;
                 }
-                
+
                 // Don't memoize if we're in an error recovery state
                 // Error recovery can change parsing behavior
                 if (this.errors.length > 0 && this.stats.errorsRecovered > 0) {
                     this.log('verbose', `⚠️ Skip memo (error state): ${key}`);
                     return;
                 }
-                
+
                 // Clean cache if it gets too large
                 if (this.memoCache.size >= this.settings.maxCacheSize * 0.9) {
                     this.cleanMemoCache();
                 }
-                
+
                 const memoEntry = {
                     result: this.deepClone(result), // Clone to avoid reference issues
                     newIndex: endIndex,
@@ -1358,7 +1364,7 @@
                     silentContext: this.isInSilentMode(),
                     errorCount: this.errors.length
                 };
-                
+
                 this.memoCache.set(key, memoEntry);
                 this.log('verbose', `📝 Memo SET: ${key} → ${endIndex}`);
             }
@@ -1368,20 +1374,20 @@
                 if (this.stats.errorsRecovered > 0 && this.errors.length > 0) {
                     return false;
                 }
-                
+
                 // Don't memoize for simple tokens (overhead not worth it)
                 if (pattern.type === 'token') {
                     return false;
                 }
-                
+
                 // Don't memoize recursive rules to avoid infinite loops
                 if (pattern.type === 'rule' && this.isRecursiveContext(pattern.name)) {
                     return false;
                 }
-                
+
                 // For complex patterns and rules, memoization is beneficial
-                return pattern.type === 'rule' || 
-                    pattern.type === 'choice' || 
+                return pattern.type === 'rule' ||
+                    pattern.type === 'choice' ||
                     pattern.type === 'seq' ||
                     (pattern.type === 'repeat' && (pattern.min > 1 || pattern.max > 1));
             }
@@ -1389,7 +1395,7 @@
             private isRecursiveContext(ruleName: string): boolean {
                 // Simple check: if we're already parsing this rule in our call stack
                 // This is a basic implementation - you might need more sophisticated detection
-                
+
                 // Count how many times this rule appears in current parsing context
                 // by checking if we're deeply nested in the same rule
                 return this.depth > 10; // Simple heuristic - adjust based on your grammar
@@ -1405,7 +1411,14 @@
 
 // ╔═══════════════════════════════════════════ MAIN ════════════════════════════════════════════╗
 
-    // ..
+    /**
+     * Parses an array of tokens using the provided rules and settings.
+     * @param tokens    - The array of tokens to parse.
+     * @param rules     - The set of rules to use for parsing.
+     * @param settings  - Additional settings to customize parsing behavior.
+     *
+     * @returns The result of the parsing operation, including the parsed AST and any errors encountered.
+    */
     export function parse(tokens: Token[], rules: Rules, settings?: ParserSettings): ParseResult {
         // create new parser
         const parser = new Parser(rules, settings);
@@ -1415,7 +1428,17 @@
         finally { parser.dispose(); }
     }
 
-    // ..
+    /**
+     * Creates a rule definition object.
+     * @param name      - The name of the rule.
+     * @param pattern   - The pattern to match against.
+     * @param options   - Additional options for the rule.
+     *
+     * @returns A rule definition object.
+     *
+     * @throws  Throws an error if `name` is falsy or not a string.
+     * @throws  Throws an error if `pattern` is falsy or not an object.
+     */
     export function createRule(name: string, pattern: Pattern, options?: Rule['options']): Rule {
         if (!name || typeof name !== 'string') {
             throw new Error('Rule name must be a non-empty string');
@@ -1427,9 +1450,19 @@
     }
 
 
-    // ████ Pattern Combinators ████
+    // ════ Pattern Combinators ════
 
 
+    /**
+     * Creates a pattern that matches a specific token.
+     *
+     * @param {string} name             - The name of the token to match.
+     * @param {boolean} [silent=false]  - A flag that indicates whether the matched token should be ignored during parsing (silent mode).
+     *
+     * @returns {Pattern} The pattern object representing the token.
+     *
+     * @throws {Error} Throws an error if `name` is falsy or not a string.
+    */
     export function token(name: string, silent: boolean = false): Pattern {
         if (!name || typeof name !== 'string') {
             throw new Error('Token name must be a non-empty string');
@@ -1437,6 +1470,16 @@
         return { type: 'token', name, silent };
     }
 
+    /**
+     * Creates a new pattern that matches a rule definition.
+     *
+     * @param {string} name             - The name of the rule to match.
+     * @param {boolean} [silent=false]  - A flag that indicates whether the matched rule should be ignored during parsing (silent mode).
+     *
+     * @returns {Pattern} A pattern object that matches the specified rule.
+     *
+     * @throws {Error} Throws an error if `name` is falsy or not a string.
+    */
     export function rule(name: string, silent: boolean = false): Pattern {
         if (!name || typeof name !== 'string') {
             throw new Error('Rule name must be a non-empty string');
@@ -1444,6 +1487,19 @@
         return { type: 'rule', name, silent };
     }
 
+    /**
+     * Creates a new pattern that matches a specified number of occurrences of the given pattern.
+     *
+     * @param {Pattern} pattern         - The pattern to match.
+     * @param {number} [min=0]          - The minimum number of times the pattern must be matched.
+     * @param {number} [max=Infinity]   - The maximum number of times the pattern can be matched.
+     * @param {Pattern} [separator]     - A pattern to match between occurrences.
+     * @param {boolean} [silent=false]  - A flag that indicates whether the matched text should be hidden in the output.
+     *
+     * @returns {Pattern} A new pattern that matches between `min` and `max` occurrences of the given pattern.
+     *
+     * @throws {Error} Throws an error if `min` is negative or `max` is less than `min`.
+    */
     export function repeat(pattern: Pattern, min = 0, max = Infinity, separator?: Pattern, silent: boolean = false): Pattern {
         if (min < 0) {
             throw new Error('Minimum repetition count cannot be negative');
@@ -1454,22 +1510,100 @@
         return { type: 'repeat', pattern, min, max, separator, silent };
     }
 
+    /**
+     * Creates a new pattern that matches one or more occurrences of the given pattern.
+     *
+     * @param {Pattern} pattern         - The pattern to match one or more times.
+     * @param {Pattern} [separator]     - A pattern to match between occurrences.
+     * @param {boolean} [silent=false]  - A flag that indicates whether the matched text should be hidden in the output.
+     *
+     * @return {Pattern} A new pattern that matches one or more occurrences of the given pattern.
+    */
     export function oneOrMore(pattern: Pattern, separator?: Pattern, silent: boolean = false): Pattern {
         return repeat(pattern, 1, Infinity, separator, silent);
     }
 
+    /**
+     * Creates a new pattern that matches zero or more occurrences of the given pattern.
+     *
+     * @param {Pattern} pattern         - The pattern to match zero or more times.
+     * @param {Pattern} [separator]     - A pattern to match between occurrences.
+     * @param {boolean} [silent=false]  - A flag that indicates whether the matched text should be hidden in the output.
+     *
+     * @return {Pattern} A new pattern that matches zero or more occurrences of the given pattern.
+    */
     export function zeroOrMore(pattern: Pattern, separator?: Pattern, silent: boolean = false): Pattern {
         return repeat(pattern, 0, Infinity, separator, silent);
     }
 
+    /**
+     * Creates a new pattern that matches zero or one occurrence of the given pattern.
+     *
+     * @param {Pattern} pattern         - The pattern to match zero or one time.
+     * @param {Pattern} [separator]     - A pattern to match between occurrences.
+     * @param {boolean} [silent=true]   - A flag that indicates whether the matched text should be hidden in the output.
+     *
+     * @return {Pattern} A new pattern that matches zero or one occurrence of the given pattern.
+    */
     export function zeroOrOne(pattern: Pattern, separator?: Pattern, silent: boolean = true): Pattern {
         return repeat(pattern, 0, 1, separator, silent);
     }
 
+    /**
+     * Matches a single occurrence of the given pattern. If the pattern fails to match, it will return an array with
+     * a single error. This is useful when you want to ensure that a pattern is matched once and only once, and if it
+     * fails to match, you want to return a specific error.
+     *
+     * @param {Pattern} pattern         - The pattern to match.
+     * @param {boolean} [silent=false]  - Whether the pattern should be silent (not fail on error).
+     *
+     * @return {Pattern} A pattern that matches the given pattern exactly once.
+     *
+     * @example
+     * // Example usage of errorOrArrayOfOne:
+     * parser.createRule('Expression',
+     *     parser.errorOrArrayOfOne(parser.silent(parser.rule('PrimaryExpression'))),
+     *     {
+     *         build: (matches) => {
+     *             return {
+     *                 kind    : 'Expression',
+     *                 span    : matches[0] && matches[0].span ? matches[0].span : { start: 0, end: 0 },
+     *                 body    : matches[0]
+     *             };
+     *         },
+     *
+     *         silent: false,
+     *
+     *         errors: [parser.error(0, "Expected Expression")],
+     *     }
+     * ),
+     *
+     * // If the pattern fails to match, it will return just one error: "Expected Expression".
+    */
+    export function errorOrArrayOfOne(pattern: Pattern, silent: boolean = false): Pattern {
+        return repeat(pattern, 1, 1, undefined, silent);
+    }
+
+    /**
+     * Creates a new pattern that matches zero or one occurrence of the given pattern.
+     *
+     * @param {Pattern} pattern     - The pattern to match zero or one time.
+     *
+     * @return {Pattern} A new pattern that matches zero or one occurrence of the given pattern.
+    */
     export function optional(pattern: Pattern): Pattern {
         return repeat(pattern, 0, 1, undefined, true);
     }
 
+    /**
+     * Creates a new pattern that matches one of multiple patterns. Throws an error if the choice has no patterns.
+     *
+     * @param {...Pattern} patterns     - The patterns to match, at least one is required.
+     *
+     * @return {Pattern} A new pattern that matches one of the given patterns.
+     *
+     * @throws {Error} Throws an error if the choice has no patterns.
+     */
     export function choice(...patterns: Pattern[]): Pattern {
         if (patterns.length === 0) {
             throw new Error('Choice must have at least one pattern');
@@ -1477,6 +1611,15 @@
         return { type: 'choice', patterns, silent: false };
     }
 
+    /**
+     * Creates a new pattern that matches multiple patterns in sequence. Throws an error if the sequence has no patterns.
+     *
+     * @param {...Pattern} patterns     - The patterns to match in sequence.
+     *
+     * @return {Pattern} A new pattern that matches the given patterns in sequence.
+     *
+     * @throws {Error} Throws an error if the sequence has no patterns.
+    */
     export function seq(...patterns: Pattern[]): Pattern {
         if (patterns.length === 0) {
             throw new Error('Sequence must have at least one pattern');
@@ -1484,63 +1627,95 @@
         return { type: 'seq', patterns, silent: false };
     }
 
-    // ████ Specific pattern ████
 
-    export function errorOrArrayOfOne(pattern: Pattern, silent: boolean = false): Pattern {
-        return repeat(pattern, 1, 1, undefined, silent);
-        // Example:
-        // parser.createRule('Expression',
-        //     parser.errorOrArrayOfOne(parser.silent(parser.rule('PrimaryExpression'))),
-        //     {
-        //         build: (matches) => {
-        //             return {
-        //                 kind    : 'Expression',
-        //                 span    : matches[0] && matches[0].span ? matches[0].span : { start: 0, end: 0 },
-        //                 body    : matches[0]
-        //             };
-        //         },
-
-        //         silent: false,
-
-        //         errors: [parser.error(0, "Expected Expression")],
-        //     }
-        // ),
-
-        // if failed, will return just one error: "Expected Expression".
-    }
+    // ════ Silent Mode Helpers ════
 
 
-    // ████ Silent Mode Helpers ████
-
+    /**
+     * Creates a new pattern that matches the given pattern but is not outputted
+     * in the AST.
+     *
+     * @param {Pattern} pattern     - The pattern to match but not output.
+     *
+     * @return {Pattern} A new pattern that matches the given pattern but is not
+     * outputted in the AST.
+     */
     export function silent<T extends Pattern>(pattern: T): T {
         return { ...pattern, silent: true };
     }
 
+    /**
+     * Creates a new pattern that matches the given pattern and is outputted in
+     * the AST.
+     *
+     * @param {Pattern} pattern     - The pattern to match and output.
+     *
+     * @return {Pattern} A new pattern that matches the given pattern and is
+     * outputted in the AST.
+     */
     export function loud<T extends Pattern>(pattern: T): T {
         return { ...pattern, silent: false };
     }
 
 
-    // ████ Error Handling ████
+    // ════ Error Handling ════
 
 
+    /**
+     * Creates a new ErrorHandler pattern that matches when the given condition is true
+     * and throws an error with the given message and code.
+     *
+     * @param {ErrorHandler['cond']} cond   - The condition function that determines if the error should be thrown.
+     * @param {string} msg                  - The error message to throw.
+     * @param {number} [code=0x999]         - The error code to throw.
+     *
+     * @return {ErrorHandler} A new ErrorHandler pattern that matches the given condition and throws an error.
+     */
     export function error( cond: ErrorHandler['cond'], msg: string, code?: number, ): ErrorHandler {
         return { cond, msg, code: code ?? 0x999 };
     }
 
+    /**
+     * A collection of error recovery strategies.
+     *
+     * @type {Object}
+     * @property {RecoveryStrategy} panicMode - Creates a recovery strategy that stops parsing and throws an error with code 0xAAA.
+     * @property {RecoveryStrategy} skipUntil - Creates a recovery strategy that skips input tokens until it finds any of the given tokens.
+    */
     export const errorRecoveryStrategies = {
+        /**
+         * Creates a recovery strategy that stops parsing and throws an error with code 0xAAA.
+         *
+         * @return {RecoveryStrategy} A recovery strategy that stops parsing.
+         */
         panicMode(): RecoveryStrategy {
             return { type: 'panic' };
         },
 
+        /**
+         * Creates a recovery strategy that skips input tokens until it finds any of the given tokens.
+         *
+         * @param {string | string[]} tokens - The tokens to skip until.
+         * @return {RecoveryStrategy} A recovery strategy that skips input tokens until it finds any of the given tokens.
+         */
         skipUntil(tokens: string | string[]): RecoveryStrategy {
             return { type: 'skipUntil', tokens: Array.isArray(tokens) ? tokens : [tokens] };
         },
     };
 
 
-    // ████ Helpers ████
+    // ════ Helpers ════
 
+
+    /**
+     * Returns the smallest span that encompasses all the given matches, or the span of the first match
+     * if there are no matches.
+     *
+     * @param {any[]} matches - An array of matches each containing a span property.
+     *
+     * @return {Span | undefined} The smallest span that encompasses all the given matches, or the span
+     * of the first match if there are no matches.
+     */
     export function getMatchesSpan(matches: any[]): Span | undefined {
         if (!matches || matches.length === 0) {
             return undefined;
@@ -1572,7 +1747,14 @@
         return undefined;
     }
 
-    export function resWithoutSpan(res: any) {
+    /**
+     * Returns a new object that is a shallow copy of the given 'res' object, but without the 'span' property.
+     *
+     * @param {any} res - An object to be copied, with any 'span' property removed.
+     *
+     * @return {any} A new object that is a shallow copy of the given 'res' object, but without the 'span' property.
+     */
+    export function resWithoutSpan(res: any): any {
         const result = { ...res };
         delete result.span;
         return result;

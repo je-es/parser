@@ -60,8 +60,12 @@ import * as parser from '@je-es/parser';
             {
                 build: (matches) => ({
                     rule: 'root',
-                    groups: matches.map(m => m.data)
-                })
+                    groups: matches.map(m => m.meta)
+                }),
+
+                // Optional custom error recovery
+                recovery: parser.errorRecoveryStrategies.skipUntil(['open']),
+                silent: false
             }
         ),
 
@@ -82,7 +86,7 @@ import * as parser from '@je-es/parser';
             {
                 build: (matches) => ({
                     rule: 'group',
-                    data: {
+                    meta: {
                         left        : matches[1].value,
                         operator    : matches[2].value,
                         right       : matches[3].value
@@ -90,22 +94,24 @@ import * as parser from '@je-es/parser';
                 }),
 
                 errors: [
-                    parser.error(0, "Expected opening parenthesis '('" ),
-                    parser.error(1, "Expected left operand", ),
-                    parser.error(2, "Expected operator", ),
-                    parser.error(3, "Expected right operand", ),
-                    parser.error(4, "Expected closing parenthesis ')'", ),
+                    parser.error(0, "Expected opening parenthesis '('", 111),
+                    parser.error(1, "Expected left operand", 222),
+                    parser.error(2, "Expected operator", 333),
+                    parser.error(3, "Expected right operand", 444),
+                    parser.error(4, "Expected closing parenthesis ')'", 555),
                 ],
+
+                silent: false,
 
                 // Example: `(+2... (3+4)`
                 // An error occurs after the first `(` due to a missing left operand.
-                // If error recovery mode is not set to `resilient`,
+                // If error recovery mode is set to `resilient`,
                 // the parser will skip over "+2... " and resume parsing from the second `(`.
                 // All errors encountered will be recorded in `parser.errors`.
                 //
-                // Note: In `resilient` mode, the parser halts at the first `(`,
+                // Note: In `strict` mode, the parser halts at the first error,
                 // capturing a single error before returning.
-                recovery: parser.errorRecoveryStrategies.skipUntil('open'),
+                // recovery: parser.errorRecoveryStrategies.skipUntil('open'),
 
                 ...
             }
@@ -128,9 +134,9 @@ import * as parser from '@je-es/parser';
         },
 
         ignored                 : ['ws'],           // Ignore whitespace tokens
-        debug                   : 'off',            // Disable debug mode
-        maxDepth                : 1000,             // Maximum recursion depth (0 = unlimited)
-        maxCacheSize            : 1000,             // Maximum cache size (0 = unlimited)
+        debug                   : 'off',            // Debug level: 'off' | 'errors' | 'rules' | 'patterns' | 'tokens' | 'verbose'
+        maxDepth                : 1000,             // Maximum recursion depth
+        maxCacheSize            : 1000,             // Maximum cache size (in megabytes)
     };
     ```
 
@@ -195,15 +201,15 @@ import * as parser from '@je-es/parser';
             "ast": [],
             "errors":[
                 {
-                    "code"    : 0x007,
+                    "code"    : 555,
                     "msg"     : "Expected closing parenthesis ')'",
-                    "range"   : { "start": { "line": 1, "col": 4, "offset": 3 }, "end": { "line": 1, "col": 5, "offset": 4 } }
+                    "span"    : { "start": 4, "end": 4 }
                 },
                 {
-                    "code"    : 0x005,
-                    "msg"     : "Expected at least 1 occurrences, got 0",
-                    "range"   : { "start": { "line": 1, "col": 4, "offset": 3 }, "end": { "line": 1, "col": 5, "offset": 4 } }
-                },
+                    "code"    : 111,
+                    "msg"     : "Expected opening parenthesis '('",
+                    "span"    : { "start": 1, "end": 2 }
+                }
             ]
         }
         ```
@@ -211,7 +217,7 @@ import * as parser from '@je-es/parser';
     - #### Error Recovery Example
 
         ```typescript
-        const res = parser.parse(tokens_of_'(+2), (3+4)', rules, parserSettings);
+        const res = parser.parse(tokens_of_'(+2, (3+4)', rules, parserSettings);
         console.log(res.ast[0].groups);
         ```
 
@@ -219,7 +225,7 @@ import * as parser from '@je-es/parser';
         // Output - Successfully parsed the second group despite error in first
         {
             "ast": [
-            {
+                {
                     "rule": "root",
                     "groups": [
                         { "left": "3", "operator": "+", "right": "4" }
@@ -228,16 +234,66 @@ import * as parser from '@je-es/parser';
             ],
             "errors": [
                 {
-                    "code"          : 0x007,
-                    "message"       : "Expected left operand",
-                    "range"         : { "start": { "line": 1, "col": 1, "offset": 0 }, "end": { "line": 1, "col": 2, "offset": 1 } }
-
+                    "code"          : 222,
+                    "msg"           : "Expected left operand",
+                    "span"          : { "start": 1, "end": 2 }
+                },
+                {
+                    "code"          : 111,
+                    "msg"           : "Expected opening parenthesis '('",
+                    "span"          : { "start": 1, "end": 2 }
                 }
             ]
         }
         ```
 
-4. ### Next Steps
+4. ### Advanced Features
+
+    - #### Silent Parsing
+        ```typescript
+        // Parse patterns silently (no errors added to error list in silent mode)
+        parser.silent(parser.token('optional_token'))
+        parser.loud(parser.token('required_token'))  // Explicit non-silent
+        ```
+
+    - #### Pattern Combinators
+        ```typescript
+        // Various pattern types available
+        parser.token('identifier')                    // Match single token
+        parser.rule('expression')                     // Reference another rule
+        parser.seq(pattern1, pattern2, pattern3)     // Sequence of patterns
+        parser.choice(pattern1, pattern2)            // Alternative patterns
+        parser.repeat(pattern, 2, 5, separator)      // Repeat with min/max/separator
+        parser.oneOrMore(pattern, separator)         // One or more occurrences
+        parser.zeroOrMore(pattern, separator)        // Zero or more occurrences
+        parser.optional(pattern)                     // Optional pattern (0 or 1)
+        parser.errorOrArrayOfOne(pattern)            // Exactly one occurrence with error handling
+        ```
+
+    - #### Enhanced Error Handling
+        ```typescript
+        // Custom error handlers with conditions
+        errors: [
+            parser.error(0, "Expected opening parenthesis"),
+            parser.error((parser, failedAt) => failedAt === 2, "Custom condition error"),
+        ]
+
+        // Recovery strategies
+        recovery: parser.errorRecoveryStrategies.panicMode()
+        recovery: parser.errorRecoveryStrategies.skipUntil(['semicolon', 'newline'])
+        ```
+
+    - #### Performance Features
+        ```typescript
+        // Memoization and caching for better performance
+        const settings = {
+            maxCacheSize: 1000,         // Cache size in megabytes
+            maxDepth: 1000,             // Maximum parsing depth
+            // ... other settings
+        };
+        ```
+
+5. ### Next Steps
 
     > For the next steps, please see the [`@je-es/syntax`](https://github.com/je-es/syntax) package.
 
@@ -246,7 +302,196 @@ import * as parser from '@je-es/parser';
 
 ## 📖 API Reference
 
-> TODO
+- #### Functions
+
+  - #### Main
+
+    ```ts
+    // Parses an array of tokens using the provided rules and settings.
+    function parse(tokens: Token[], rules: Rules, settings?: ParserSettings): ParseResult
+
+    // Creates a rule definition object.
+    function createRule(name: string, pattern: Pattern, options?: Rule['options']): Rule
+    ```
+
+  - #### Pattern Combinators
+
+    ```ts
+    // Creates a pattern that matches a specific token.
+    function token(name: string, silent: boolean = false): Pattern;
+
+    // Creates a new pattern that matches a rule definition.
+    export function rule(name: string, silent: boolean = false): Pattern;
+
+    // Creates a new pattern that matches a specified number of occurrences of the given pattern.
+    function repeat(pattern: Pattern, min = 0, max = Infinity, separator?: Pattern, silent: boolean = false): Pattern;
+
+    // Creates a new pattern that matches one or more occurrences of the given pattern.
+    function oneOrMore(pattern: Pattern, separator?: Pattern, silent: boolean = false): Pattern;
+
+    // Creates a new pattern that matches zero or more occurrences of the given pattern.
+    function zeroOrMore(pattern: Pattern, separator?: Pattern, silent: boolean = false): Pattern;
+
+    // Creates a new pattern that matches zero or one occurrence of the given pattern.
+    function zeroOrOne(pattern: Pattern, separator?: Pattern, silent: boolean = true): Pattern;
+
+    // Matches a single occurrence of the given pattern.
+    // If the pattern fails to match, it will return an array with a single error.
+    function errorOrArrayOfOne(pattern: Pattern, silent: boolean = false): Pattern;
+
+    // Creates a new pattern that matches zero or one occurrence
+    // of the given pattern (automatically silent).
+    function optional(pattern: Pattern): Pattern;
+
+    // Creates a new pattern that matches one of multiple patterns
+    // (first successful match wins).
+    function choice(...patterns: Pattern[]): Pattern;
+
+    // Creates a new pattern that matches multiple patterns in sequence.
+    function seq(...patterns: Pattern[]): Pattern;
+    ```
+
+  - #### Silent Mode Helpers
+
+    ```ts
+    // Creates a new pattern that matches the given pattern but is not outputted in the AST.
+    function silent<T extends Pattern>(pattern: T): T;
+
+    // Creates a new pattern that matches the given pattern and is outputted in the AST.
+    function loud<T extends Pattern>(pattern: T): T;
+    ```
+
+  - #### Error Handling
+
+    ```ts
+    // Creates a new ErrorHandler pattern that matches when the given condition is true
+    //and throws an error with the given message and code.
+    function error( cond: ErrorHandler['cond'], msg: string, code?: number, ): ErrorHandler;
+    ```
+
+    ```ts
+    // A collection of error recovery strategies.
+    const errorRecoveryStrategies = {
+        // Creates a recovery strategy that stops parsing and throws an error with code 0xAAA.
+        panicMode(): RecoveryStrategy,
+
+        // Creates a recovery strategy that skips input tokens until it finds any of the given tokens.
+        skipUntil(tokens: string | string[]): RecoveryStrategy,
+    };
+    ```
+
+  - #### Helpers
+
+    ```ts
+    // Returns the smallest span that encompasses all the given matches
+    // or the span of the first match if there are no matches.
+    function getMatchesSpan(matches: any[]): Span | undefined;
+
+    // Returns a new object that is a shallow copy of the given 'res' object,
+    // but without the 'span' property.
+    function resWithoutSpan(res: any): any;
+    ```
+
+
+- #### Types
+
+    ```ts
+    // Represents a span in the source text
+    interface Span {
+        start           : number;
+        end             : number;
+    }
+
+    // Represents a token with type, value and position information
+    interface Token {
+        type            : string;
+        value           : string | null;
+        span            : Span;
+    }
+
+    // Represents a pattern in the grammar
+    interface Pattern {
+        type            : 'token' | 'rule' | 'repeat' | 'choice' | 'seq';
+        [key: string]   : any;
+        silent          : boolean; // Fixed typo: scilent -> silent
+    }
+
+    // Represents an error handler
+    interface ErrorHandler {
+        cond            : number | ((parser: Parser, failedAt: number, force?: boolean) => boolean);
+        msg             : string;
+        code           ?: number;
+    }
+
+    // Represents a recovery strategy
+    interface RecoveryStrategy {
+        type            : 'panic' | 'skipUntil';
+        tokens         ?: string[];
+        token          ?: string;
+    }
+
+    // Represents a rule in the grammar
+    interface Rule {
+        name            : string;
+        pattern         : Pattern;
+
+        options        ?: {
+            build      ?: (matches: any[]) => any;
+            errors     ?: ErrorHandler[];
+            recovery   ?: RecoveryStrategy;
+            ignored    ?: string[];
+            silent     ?: boolean; // Rule-level silent mode
+        };
+    }
+
+    // Represents a list of rules
+    type Rules = Rule[];
+
+    // Represents a parse statistics
+    interface ParseStatistics {
+        tokensProcessed : number;
+        rulesApplied    : number;
+        errorsRecovered : number;
+        parseTimeMs     : number;
+    }
+
+    // Represents an AST node
+    interface AstNode {
+        rule            : string;
+        span            : Span;
+        value          ?: string | number | boolean | null;
+    }
+
+    interface ParseError {
+        msg             : string;
+        code            : number;
+        span            : Span;
+    }
+
+    // Represents a parse result
+    interface ParseResult {
+        ast             : AstNode[];
+        errors          : ParseError[];
+        statistics     ?: ParseStatistics;
+    }
+
+    // Represents a debug level
+    type DebugLevel = 'off' | 'errors' | 'rules' | 'patterns' | 'tokens' | 'verbose';
+
+    // Represents a parser settings
+    interface ParserSettings {
+        startRule       : string;
+        errorRecovery  ?: {
+            mode       ?: 'strict' | 'resilient';
+            maxErrors  ?: number;
+            syncTokens ?: string[];
+        };
+        ignored        ?: string[];
+        debug          ?: DebugLevel;
+        maxDepth       ?: number;
+        maxCacheSize   ?: number; // in megabytes
+    }
+    ```
 
 <br>
 <div align="center">
