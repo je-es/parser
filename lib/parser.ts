@@ -70,11 +70,15 @@
     }
 
     // Represents an AST node
-    export interface AstNode {
+    export type BaseAstNode = {
         rule            : string;
         span            : Span;
         value          ?: string | number | boolean | null;
     }
+
+    // With this we can customize the AST for the next stages
+    // depending on your needs
+    export type AstNode = BaseAstNode | any;
 
     export interface ParseError {
         msg             : string;

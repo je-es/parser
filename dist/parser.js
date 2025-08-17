@@ -98,6 +98,13 @@ var Parser = class {
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌─────────────────────────────── MAIN ───────────────────────────────┐
+  /**
+   * Parses the given tokens using the defined rules and returns the AST and errors.
+   *
+   * @param {Token[]} tokens - The tokens to parse.
+   *
+   * @return {ParseResult} The AST and errors generated during parsing.
+  */
   parse(tokens) {
     {
       this.resetState(tokens);
@@ -485,9 +492,6 @@ var Parser = class {
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌─────────────────────────────── SILENT MODE ───────────────────────────────┐
-  /**
-   * Determines if a pattern should be parsed in silent mode
-   */
   shouldBeSilent(pattern, rule2) {
     var _a;
     if (((_a = rule2 == null ? void 0 : rule2.options) == null ? void 0 : _a.silent) === true) {
@@ -501,9 +505,6 @@ var Parser = class {
     }
     return false;
   }
-  /**
-   * Checks if we're currently in silent parsing mode
-   */
   isInSilentMode() {
     return this.silentContextStack.length > 0 && this.silentContextStack[this.silentContextStack.length - 1];
   }
@@ -987,6 +988,9 @@ function zeroOrMore(pattern, separator, silent2 = false) {
 function zeroOrOne(pattern, separator, silent2 = true) {
   return repeat(pattern, 0, 1, separator, silent2);
 }
+function errorOrArrayOfOne(pattern, silent2 = false) {
+  return repeat(pattern, 1, 1, void 0, silent2);
+}
 function optional(pattern) {
   return repeat(pattern, 0, 1, void 0, true);
 }
@@ -1002,9 +1006,6 @@ function seq(...patterns) {
   }
   return { type: "seq", patterns, silent: false };
 }
-function errorOrArrayOfOne(pattern, silent2 = false) {
-  return repeat(pattern, 1, 1, void 0, silent2);
-}
 function silent(pattern) {
   return __spreadProps(__spreadValues({}, pattern), { silent: true });
 }
@@ -1015,9 +1016,20 @@ function error(cond, msg, code) {
   return { cond, msg, code: code != null ? code : 2457 };
 }
 var errorRecoveryStrategies = {
+  /**
+   * Creates a recovery strategy that stops parsing and throws an error with code 0xAAA.
+   *
+   * @return {RecoveryStrategy} A recovery strategy that stops parsing.
+   */
   panicMode() {
     return { type: "panic" };
   },
+  /**
+   * Creates a recovery strategy that skips input tokens until it finds any of the given tokens.
+   *
+   * @param {string | string[]} tokens - The tokens to skip until.
+   * @return {RecoveryStrategy} A recovery strategy that skips input tokens until it finds any of the given tokens.
+   */
   skipUntil(tokens) {
     return { type: "skipUntil", tokens: Array.isArray(tokens) ? tokens : [tokens] };
   }

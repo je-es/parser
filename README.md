@@ -321,7 +321,7 @@ import * as parser from '@je-es/parser';
     function token(name: string, silent: boolean = false): Pattern;
 
     // Creates a new pattern that matches a rule definition.
-    export function rule(name: string, silent: boolean = false): Pattern;
+    function rule(name: string, silent: boolean = false): Pattern;
 
     // Creates a new pattern that matches a specified number of occurrences of the given pattern.
     function repeat(pattern: Pattern, min = 0, max = Infinity, separator?: Pattern, silent: boolean = false): Pattern;
@@ -456,11 +456,15 @@ import * as parser from '@je-es/parser';
     }
 
     // Represents an AST node
-    interface AstNode {
+    type BaseAstNode = {
         rule            : string;
         span            : Span;
         value          ?: string | number | boolean | null;
     }
+
+    // With this we can customize the AST for the next stages
+    // depending on your needs
+    type AstNode = BaseAstNode | any;
 
     interface ParseError {
         msg             : string;
