@@ -1720,9 +1720,10 @@
      * @return {Span | undefined} The smallest span that encompasses all the given matches, or the span
      * of the first match if there are no matches.
      */
-    export function getMatchesSpan(matches: any[]): Span | undefined {
+    export function getMatchesSpan(matches: any[]): Span {
+        const default_span = { start: 0, end: 0};
         if (!matches || matches.length === 0) {
-            return undefined;
+            return default_span;
         }
 
         let firstSpan: Span | null = null;
@@ -1748,7 +1749,7 @@
             return firstSpan;
         }
 
-        return undefined;
+        return default_span;
     }
 
     /**

@@ -1035,8 +1035,9 @@ var errorRecoveryStrategies = {
   }
 };
 function getMatchesSpan(matches) {
+  const default_span = { start: 0, end: 0 };
   if (!matches || matches.length === 0) {
-    return void 0;
+    return default_span;
   }
   let firstSpan = null;
   let lastSpan = null;
@@ -1057,7 +1058,7 @@ function getMatchesSpan(matches) {
   if (firstSpan) {
     return firstSpan;
   }
-  return void 0;
+  return default_span;
 }
 function resWithoutSpan(res) {
   const result = __spreadValues({}, res);

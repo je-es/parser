@@ -353,7 +353,7 @@ declare const errorRecoveryStrategies: {
  * @return {Span | undefined} The smallest span that encompasses all the given matches, or the span
  * of the first match if there are no matches.
  */
-declare function getMatchesSpan(matches: any[]): Span | undefined;
+declare function getMatchesSpan(matches: any[]): Span;
 /**
  * Returns a new object that is a shallow copy of the given 'res' object, but without the 'span' property.
  *
