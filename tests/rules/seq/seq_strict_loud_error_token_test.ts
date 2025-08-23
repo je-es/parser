@@ -50,7 +50,6 @@
         errorRecovery       : {
             mode            : 'strict',      // 'strict' | 'resilient'
             maxErrors       : 1,                // Stop after N errors (0 = unlimited)
-            syncTokens      : []                // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens
@@ -88,12 +87,12 @@
                     span: { start: 0, end: 5 },
                     value: [
                         {
-                            type: 'ok',
+                            kind: 'ok',
                             span: { start: 0, end: 2 },
                             value: 'ok'
                         },
                         {
-                            type: 'fk',
+                            kind: 'fk',
                             span: { start: 3, end: 5 },
                             value: 'fk'
                         }

@@ -53,6 +53,7 @@
                     //     parser.error(0, "Expected ok", 0x555)
                     // ],
 
+                    recovery: parser.errorRecoveryStrategies.skipUntil('ok'),
                     silent: false
                 }
             ),
@@ -66,7 +67,6 @@
         errorRecovery       : {
             mode            : 'resilient',      // 'strict' | 'resilient'
             maxErrors       : 0,                // Stop after N errors (0 = unlimited)
-            syncTokens      : ['ok']                // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens
@@ -115,7 +115,15 @@
                     code: 0x002,
                     msg: `Expected 'ok', got 'notOk'`,
                     span: { start: 0, end: 0 }
-                }
+                },
+                {
+                    code: 2,
+                    msg: "Expected 'ok', got 'sep'",
+                    span: {
+                        start: 5,
+                        end: 6
+                    }
+                },
             ],
             ast: [
                 {

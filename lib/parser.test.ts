@@ -67,15 +67,23 @@
         // Describe each file and test each case inside it
         allCases.forEach(({ filename, module }) => {
             // const blocked = [
-            //     'More_test.ts',
+            //     'BlahBlah.ts',
             //     ];
-            const real_filename = path.parse(filename).base;
+            // const real_filename = path.parse(filename).base;
             // if(!blocked.includes(real_filename)) return;
             describe(`Test cases from ${filename}`, () => {
                 for (const [name, { input, ast = [], errors = [] }] of Object.entries(module.cases)) {
                     it(name, () => {
                         const tokens = lexer.tokenize(input, module.rules.lexerRules);
                         const result = parser.parse(tokens, module.rules.parserRules, module.rules.settings);
+                        // remove field (failedAt) from errors
+                        result.errors = result.errors.map((error: any) => {
+                            delete error.failedAt;
+                            delete error.tokenIndex;
+                            delete error.prevRule;
+                            delete error.prevInnerRule;
+                            return error;
+                        });
                         // console.log(JSON.stringify(tokens, null, 2));
                         // console.log(JSON.stringify(result, null, 2));
 

@@ -48,7 +48,6 @@
         errorRecovery       : {
             mode            : 'strict',      // 'strict' | 'resilient'
             maxErrors       : 1,                // Stop after N errors (0 = unlimited)
-            syncTokens      : []                // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens

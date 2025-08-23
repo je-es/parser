@@ -45,7 +45,6 @@
         errorRecovery       : {
             mode            : 'strict',      // 'strict' | 'resilient'
             maxErrors       : 1,                // Stop after N errors (0 = unlimited)
-            syncTokens      : []                // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens
@@ -68,7 +67,7 @@
                     rule: 'rootChoice',
                     span: { start: 0, end: 2 },
                     value: {
-                        type: 'ok',
+                        kind: 'ok',
                         span: { start: 0, end: 2 },
                         value: 'ok'
                     }
@@ -82,7 +81,7 @@
                     rule: 'rootChoice',
                     span: { start: 0, end: 2 },
                     value: {
-                        type: 'fk',
+                        kind: 'fk',
                         span: { start: 0, end: 2 },
                         value: 'fk'
                     }
@@ -96,7 +95,7 @@
                     rule: 'rootChoice',
                     span: { start: 0, end: 2 },
                     value: {
-                        type: 'ok',
+                        kind: 'ok',
                         span: { start: 0, end: 2 },
                         value: 'ok'
                     }
@@ -104,8 +103,8 @@
             ],
             errors: [
                 {
-                    code: 9,
-                    msg: "No matching pattern found in choice",
+                    code: 2,
+                    msg: "Expected 'fk', got 'sep'",
                     span: { start: 2, end: 3 }
                 }
             ]
@@ -128,8 +127,8 @@
             ast: [],
             errors: [
                 {
-                    code: 9,
-                    msg: "No matching pattern found in choice",
+                    code: 2,
+                    msg: "Expected 'fk', got 'notOk'",
                     span: { start: 0, end: 0 }
                 }
             ]

@@ -111,8 +111,7 @@ import * as parser from '@je-es/parser';
                 //
                 // Note: In `strict` mode, the parser halts at the first error,
                 // capturing a single error before returning.
-                // recovery: parser.errorRecoveryStrategies.skipUntil('open'),
-
+                recovery: parser.errorRecoveryStrategies.skipUntil('open'),
                 ...
             }
         ),
@@ -130,7 +129,6 @@ import * as parser from '@je-es/parser';
         errorRecovery           : {
             mode                : 'resilient',      // 'strict' | 'resilient'
             maxErrors           : 0,                // Stop after N errors (0 = unlimited)
-            syncTokens          : ['open']          // Tokens to sync on during recovery
         },
 
         ignored                 : ['ws'],           // Ignore whitespace tokens
@@ -267,7 +265,6 @@ import * as parser from '@je-es/parser';
         parser.oneOrMore(pattern, separator)         // One or more occurrences
         parser.zeroOrMore(pattern, separator)        // Zero or more occurrences
         parser.optional(pattern)                     // Optional pattern (0 or 1)
-        parser.errorOrArrayOfOne(pattern)            // Exactly one occurrence with error handling
         ```
 
     - #### Enhanced Error Handling
@@ -279,7 +276,6 @@ import * as parser from '@je-es/parser';
         ]
 
         // Recovery strategies
-        recovery: parser.errorRecoveryStrategies.panicMode()
         recovery: parser.errorRecoveryStrategies.skipUntil(['semicolon', 'newline'])
         ```
 
@@ -295,7 +291,7 @@ import * as parser from '@je-es/parser';
 
 5. ### Next Steps
 
-    > For the next steps, please see the [`@je-es/syntax`](https://github.com/je-es/syntax) package.
+    > For the next steps, please see the [`@je-es/syntax`](https://github.com/je-es/syntax) and [`@je-es/program`](https://github.com/je-es/program) packages.
 
 <br>
 <!--------------------------------------------------------------------------->
@@ -335,12 +331,11 @@ import * as parser from '@je-es/parser';
     // Creates a new pattern that matches zero or one occurrence of the given pattern.
     function zeroOrOne(pattern: Pattern, separator?: Pattern, silent: boolean = true): Pattern;
 
-    // Matches a single occurrence of the given pattern.
-    // If the pattern fails to match, it will return an array with a single error.
-    function errorOrArrayOfOne(pattern: Pattern, silent: boolean = false): Pattern;
 
     // Creates a new pattern that matches zero or one occurrence
     // of the given pattern (automatically silent).
+    // always return array
+    // u can use helpers like: parser.isOptionalPassed() and getOptional()
     function optional(pattern: Pattern): Pattern;
 
     // Creates a new pattern that matches one of multiple patterns
@@ -372,9 +367,6 @@ import * as parser from '@je-es/parser';
     ```ts
     // A collection of error recovery strategies.
     const errorRecoveryStrategies = {
-        // Creates a recovery strategy that stops parsing and throws an error with code 0xAAA.
-        panicMode(): RecoveryStrategy,
-
         // Creates a recovery strategy that skips input tokens until it finds any of the given tokens.
         skipUntil(tokens: string | string[]): RecoveryStrategy,
     };
@@ -411,7 +403,7 @@ import * as parser from '@je-es/parser';
 
     // Represents a pattern in the grammar
     interface Pattern {
-        type            : 'token' | 'rule' | 'repeat' | 'choice' | 'seq';
+        type            : 'token' | 'rule' | 'repeat' | 'choice' | 'seq' | 'optional';
         [key: string]   : any;
         silent          : boolean; // Fixed typo: scilent -> silent
     }
@@ -425,7 +417,7 @@ import * as parser from '@je-es/parser';
 
     // Represents a recovery strategy
     interface RecoveryStrategy {
-        type            : 'panic' | 'skipUntil';
+        type            : 'skipUntil';
         tokens         ?: string[];
         token          ?: string;
     }
@@ -488,7 +480,6 @@ import * as parser from '@je-es/parser';
         errorRecovery  ?: {
             mode       ?: 'strict' | 'resilient';
             maxErrors  ?: number;
-            syncTokens ?: string[];
         };
         ignored        ?: string[];
         debug          ?: DebugLevel;
@@ -514,6 +505,10 @@ import * as parser from '@je-es/parser';
 
   - ##### [@je-es/syntax](https://github.com/je-es/syntax)
       > Unified wrapper that streamlines syntax creation with integrated lexer-parser coordination, LSP support, and enhanced linting capabilities.
+
+
+  - ##### [@je-es/program](https://github.com/je-es/program)
+      > A high-performance, type-safe program representation library with advanced semantic analysis for programming languages.
 
 <br>
 <div align="center">

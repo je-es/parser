@@ -8,60 +8,51 @@
 
 
 
-// ╔═══════════════════════════════════════════ TYPE ════════════════════════════════════════════╗
+// ╔════════════════════════════════════════ PACK ════════════════════════════════════════╗
 
-    // Represents a span in the source text
+    export interface Token {
+        kind            : string;
+        value           : string | null;
+        span            : Span;
+    }
+
     export interface Span {
         start           : number;
         end             : number;
     }
 
-    // Represents a token with type, value and position information
-    export interface Token {
-        type            : string;
-        value           : string | null;
-        span            : Span;
-    }
-
-    // Represents a pattern in the grammar
     export interface Pattern {
-        type            : 'token' | 'rule' | 'repeat' | 'choice' | 'seq';
+        type            : 'token' | 'rule' | 'repeat' | 'choice' | 'seq' | 'optional';
         [key: string]   : any;
-        silent          : boolean; // Fixed typo: scilent -> silent
+        silent          : boolean;
     }
 
-    // Represents an error handler
     export interface ErrorHandler {
-        cond            : number | ((parser: Parser, failedAt: number, force?: boolean) => boolean);
+        cond            : number | ((parser: Parser, opt: { failedAt: number, tokenIndex: number, force?: boolean, prevRule?: string, prevInnerRule?: string }) => boolean);
         msg             : string;
-        code           ?: number;
+        code?           : number;
     }
 
-    // Represents a recovery strategy
     export interface RecoveryStrategy {
-        type            : 'panic' | 'skipUntil';
-        tokens         ?: string[];
-        token          ?: string;
+        type            : 'skipUntil';
+        tokens?         : string[];
+        token?          : string;
     }
 
-    // Represents a rule in the grammar
     export interface Rule {
         name            : string;
         pattern         : Pattern;
-
-        options        ?: {
-            build      ?: (matches: any[]) => any;
-            errors     ?: ErrorHandler[];
-            recovery   ?: RecoveryStrategy;
-            ignored    ?: string[];
-            silent     ?: boolean; // Rule-level silent mode
+        options?        : {
+            build?      : (matches: any[]) => any;
+            errors?     : ErrorHandler[];
+            recovery?   : RecoveryStrategy;
+            ignored?    : string[];
+            silent?     : boolean;
         };
     }
 
-    // Represents a list of rules
     export type Rules = Rule[];
 
-    // Represents a parse statistics
     export interface ParseStatistics {
         tokensProcessed : number;
         rulesApplied    : number;
@@ -69,123 +60,120 @@
         parseTimeMs     : number;
     }
 
-    // Represents an AST node
     export type BaseAstNode = {
         rule            : string;
         span            : Span;
-        value          ?: string | number | boolean | null;
+        value?          : string | number | boolean | null;
     }
 
-    // With this we can customize the AST for the next stages
-    // depending on your needs
     export type AstNode = BaseAstNode | any;
 
     export interface ParseError {
         msg             : string;
         code            : number;
         span            : Span;
+        failedAt        : number;
+        tokenIndex      : number;
+        prevRule        : string;
+        prevInnerRule?  : string;
     }
 
-    // Represents a parse result
     export interface ParseResult {
         ast             : AstNode[];
         errors          : ParseError[];
-        statistics     ?: ParseStatistics;
+        statistics?     : ParseStatistics;
     }
 
-    // Represents a debug level
     export type DebugLevel = 'off' | 'errors' | 'rules' | 'patterns' | 'tokens' | 'verbose';
 
-    // Represents a parser settings
     export interface ParserSettings {
         startRule       : string;
-        errorRecovery  ?: {
-            mode       ?: 'strict' | 'resilient';
-            maxErrors  ?: number;
-            syncTokens ?: string[];
+        errorRecovery?  : {
+            mode?       : 'strict' | 'resilient';
+            maxErrors?  : number;
         };
-        ignored        ?: string[];
-        debug          ?: DebugLevel;
-        maxDepth       ?: number;
-        maxCacheSize   ?: number; // in megabytes
+        ignored?        : string[];
+        debug?          : DebugLevel;
+        maxDepth?       : number;
+        maxCacheSize?   : number;
     }
 
-// ╚══════════════════════════════════════════════════════════════════════════════════════════════╝
+    export const ERRORS = {
+        // Core parsing errors (0x000 - 0x099)
+        LEXICAL_ERROR           : 0x000,
+        TOKEN_EXPECTED_EOF      : 0x001,
+        TOKEN_MISMATCH          : 0x002,
+        RULE_FAILED             : 0x003,
+        BUILD_FUNCTION_FAILED   : 0x004,
+        REPEAT_MIN_NOT_MET      : 0x005,
+        SEQUENCE_FAILED         : 0x006,
+        CUSTOM_ERROR            : 0x007,
+
+        // Choice and alternatives (0x008 - 0x00F)
+        CHOICE_ALL_FAILED       : 0x009,
+
+        // System errors (0x400 - 0x4FF)
+        FATAL_ERROR             : 0x404,
+        UNKNOWN_ERROR           : 0x500,
+
+        // Recovery and validation (0x900 - 0x999)
+        RECOVERY_CUSTOM         : 0x999,
+    } as const;
+
+// ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
 
 
-// ╔═══════════════════════════════════════════ CORE ════════════════════════════════════════════╗
+// ╔════════════════════════════════════════ CORE ════════════════════════════════════════╗
 
-    /**
-     * Parser class for advanced syntax analysis.
-     * Parses tokens into AST with customizable grammar rules and intelligent error detection.
-     * @class
-    */
     export class Parser {
 
-        // ┌─────────────────────────────── DATA ───────────────────────────────┐
+        // ┌──────────────────────────────── INIT ──────────────────────────────┐
 
-            // ..
+            // Core data
             public rules            : Map<string, Rule>;
             public settings         : ParserSettings;
 
-            // ..
-            public tokens           : Token[]               = [];
-            public ast              : AstNode[]             = [];
-            public errors           : ParseError[]          = [];
+            // State
+            public tokens           : Token[] = [];
+            public ast              : AstNode[] = [];
+            public errors           : ParseError[] = [];
+            public index            : number = 0;
+            public depth            : number = 0;
 
-            // ..
-            public index            : number                = 0;
-            public depth            : number                = 0;
-
-            // Debug system
+            // Debug & stats
             private debugLevel      : DebugLevel;
-            private indentLevel     : number                = 0;
-
-            // Statistics
+            private indentLevel     : number = 0;
             public stats            : ParseStatistics;
-            public startTime        : number                = 0;
-            public errorSeq         : number                = 0;
+            public startTime        : number = 0;
+            public errorSeq         : number = 0;
 
-            // Performance optimizations
-            public memoCache        : Map<string, any>      = new Map<string, any>();
-            public ignoredSet       : Set<string>           = new Set<string>();
+            // Performance
+            public memoCache        : Map<string, any> = new Map();
+            public ignoredSet       : Set<string> = new Set();
+            public memoHits         : number = 0;
+            public memoMisses       : number = 0;
 
-            // Memoization statistics
-            public memoHits         : number                = 0;
-            public memoMisses       : number                = 0;
-
-            // Silent mode context stack - tracks when we're in silent parsing
-            private silentContextStack : boolean[]          = [];
-
-        // └────────────────────────────────────────────────────────────────────┘
-
-
-        // ┌─────────────────────────────── INIT ───────────────────────────────┐
+            // Context tracking
+            private silentContextStack  : boolean[] = [];
+            public lastVisitedIndex     : number = 0;
+            public lastHandledRule      : string = 'unknown';
+            public ruleStack            : string[] = [];
+            public patternStack         : string[] = [];
+            public lastInnerRule        : string = 'unknown';
+            public lastCompletedRule    : string = 'unknown';
+            public successfulRules      : string[] = [];
+            private globalSuccessRules  : string[] = [];
+            private lastLeafRule        : string = 'unknown';
 
             constructor(rules: Rule[], settings?: ParserSettings) {
-                // set => rules
-                this.rules = new Map();
-                rules.forEach(rule => this.rules.set(rule.name, rule));
+                this.rules          = new Map(rules.map(rule => [rule.name, rule]));
+                this.settings       = this.normalizeSettings(settings);
+                this.debugLevel     = this.settings.debug!;
+                this.ignoredSet     = new Set(this.settings.ignored!);
 
-                // set => settings
-                this.settings = this.normalizeSettings(settings);
+                this.stats = { tokensProcessed: 0, rulesApplied: 0, errorsRecovered: 0, parseTimeMs: 0 };
 
-                // set => debug
-                this.debugLevel = this.settings.debug!;
-
-                // set => ignored
-                this.ignoredSet = new Set([...this.settings.ignored!]);
-
-                // set => stats
-                this.stats = {
-                    tokensProcessed     : 0,
-                    rulesApplied        : 0,
-                    errorsRecovered     : 0,
-                    parseTimeMs         : 0
-                };
-
-                // Validate grammar
                 const grammarIssues = this.validateGrammar();
                 if (grammarIssues.length > 0) {
                     throw new Error(`Grammar validation failed: ${grammarIssues.join(', ')}`);
@@ -195,80 +183,47 @@
         // └────────────────────────────────────────────────────────────────────┘
 
 
-        // ┌─────────────────────────────── MAIN ───────────────────────────────┐
+        // ┌──────────────────────────────── MAIN ──────────────────────────────┐
 
-            /**
-             * Parses the given tokens using the defined rules and returns the AST and errors.
-             *
-             * @param {Token[]} tokens - The tokens to parse.
-             *
-             * @return {ParseResult} The AST and errors generated during parsing.
-            */
             parse(tokens: Token[]): ParseResult {
-                // Before
-                {
-                    this.resetState(tokens);
-                    this.startTime = Date.now();
-                    this.log('rules', `🚀 Parse started: ${tokens.length} tokens`);
-                }
+                this.resetState(tokens);
+                this.startTime = Date.now();
+                this.log('rules', `🚀 Parse started: ${tokens.length} tokens`);
 
-                // Early Break
-                {
-                    // check tokens length
-                    if (!tokens?.length) { return { ast: [], errors: [] }; }
+                // Early validation
+                if (!tokens?.length) return { ast: [], errors: [] };
 
-                    // check if tokens contains error tokens
-                    if(tokens.some(token => token.type === 'error')) {
-                        const errorToken = tokens.find(token => token.type === 'error');
-                        return {
-                            ast     : [],
-                            errors  : [this.createError(0x000, `Unexpected token '${errorToken?.value}'`, errorToken?.span)]
-                        };
-                    }
-                }
-
-                // Parse
-                {
-                    try {
-                        // Get start rule
-                        const startRule = this.rules.get(this.settings.startRule);
-                        if (!startRule) {
-                            throw new Error(`Start rule '${this.settings.startRule}' not found`);
-                        }
-
-                        // Skip ignored tokens
-                        this.skipIgnored();
-
-                        // Parse with error recovery
-                        this.parseWithRecovery(startRule);
-
-                        // Skip ignored tokens
-                        this.skipIgnored();
-                    }
-
-                    catch (err: any) {
-                        this.handleFatalError(err);
-                    }
-                }
-
-                // After
-                {
-                    this.stats.parseTimeMs = Date.now() - this.startTime;
-                    this.log('rules', `✅ Parse completed: ${this.ast.length} nodes, ${this.errors.length} errors (${this.stats.parseTimeMs}ms)`);
-                    this.log('verbose', `📊 Memo stats: ${this.memoHits} hits, ${this.memoMisses} misses, ${this.memoCache.size} cached entries`);
-
+                const errorToken = tokens.find(token => token.kind === 'error');
+                if (errorToken) {
                     return {
-                        ast: this.ast,
-                        errors: this.errors,
-                        statistics: this.stats
+                        ast: [],
+                        errors: [this.createError(ERRORS.LEXICAL_ERROR, `Unexpected token '${errorToken.value}'`, errorToken.span, 0, 0, this.lastHandledRule)]
                     };
                 }
+
+                try {
+                    const startRule = this.rules.get(this.settings.startRule);
+                    if (!startRule) {
+                        throw new Error(`Start rule '${this.settings.startRule}' not found`);
+                    }
+
+                    this.skipIgnored();
+                    this.parseWithRecovery(startRule);
+                    this.skipIgnored();
+                } catch (err: any) {
+                    this.handleFatalError(err);
+                }
+
+                this.stats.parseTimeMs = Date.now() - this.startTime;
+                this.log('rules', `✅ Parse completed: ${this.ast.length} nodes, ${this.errors.length} errors (${this.stats.parseTimeMs}ms)`);
+                this.log('verbose', `📊 Memo stats: ${this.memoHits} hits, ${this.memoMisses} misses, ${this.memoCache.size} cached entries`);
+
+                return {
+                    ast: this.ast,
+                    errors: this.errors,
+                    statistics: this.stats
+                };
             }
-
-        // └────────────────────────────────────────────────────────────────────┘
-
-
-        // ┌─────────────────────────────── CORE ───────────────────────────────┐
 
             private parseWithRecovery(startRule: Rule): void {
                 const maxErrors = this.settings.errorRecovery!.maxErrors!;
@@ -278,10 +233,8 @@
                     const beforeIndex = this.index;
 
                     try {
-                        // Parse start rule
                         const result = this.parsePattern(startRule.pattern, startRule);
 
-                        // Build AST node
                         if (result !== null) {
                             const processed = startRule.options?.build
                                 ? this.safeBuild(startRule.options.build, result)
@@ -292,474 +245,584 @@
                             }
                         }
 
-                        // Reset consecutive error counter on success
                         consecutiveErrors = 0;
 
-                        // Break if we've consumed all tokens or no progress
                         if (this.index >= this.tokens.length || this.index === beforeIndex) {
                             break;
                         }
-                    }
-                    catch (error: any) {
+                    } catch (error: any) {
                         consecutiveErrors++;
 
-                        // Convert to ParseError and add to errors
                         const parseError = this.normalizeError(error, this.getCurrentSpan());
                         this.addError(parseError);
 
-                        // Apply recovery strategy
-                        this.applyRecovery(startRule, beforeIndex);
+                        // FIXED: Better error recovery application
+                        if (this.settings.errorRecovery!.mode === 'resilient') {
+                            this.applyRecovery(startRule, beforeIndex);
 
-                        // Prevent infinite loops
-                        if (consecutiveErrors > 10 || this.index === beforeIndex) {
-                            if (this.index < this.tokens.length) {
+                            // Force progress if we're stuck
+                            if (this.index === beforeIndex && this.index < this.tokens.length) {
                                 this.index++;
-                            } else {
-                                break;
                             }
+                        } else {
+                            // In strict mode, stop after first error
+                            break;
                         }
 
-                        // In strict mode, stop after first error
-                        if (this.settings.errorRecovery!.mode === 'strict') {
+                        if (consecutiveErrors > 10) {
                             break;
                         }
                     }
 
-                    // Skip ignored tokens
                     this.skipIgnored();
                 }
             }
 
             protected parsePattern(pattern: Pattern, parentRule?: Rule): any {
-                // Check depth
+                this.lastHandledRule = pattern.type;
+
                 if (this.depth > this.settings.maxDepth!) {
                     throw new Error('Maximum parsing depth exceeded');
                 }
 
-                // Determine if this pattern should be silent
+                // CRITICAL FIX: Better silent context management
                 const shouldBeSilent = this.shouldBeSilent(pattern, parentRule);
 
-                // Push silent context
-                this.silentContextStack.push(shouldBeSilent);
+                // For optional patterns, we need special handling
+                const isOptionalContext = parentRule?.name === 'optional' ||
+                                        this.patternStack[this.patternStack.length - 1] === 'optional';
 
-                // Save current data
+                this.silentContextStack.push(shouldBeSilent || isOptionalContext);
+
                 const startIndex = this.index;
+                const memoKey = this.shouldUseMemoization(pattern, parentRule)
+                    ? this.createMemoKey(pattern.type, pattern, startIndex, parentRule?.name)
+                    : null;
 
-                // Create memoization key
-                const memoKey = this.createMemoKey(pattern.type, pattern, startIndex, parentRule?.name);
-
-                // Check memo cache - but be more selective about when to use it
-                let memoResult: { hit: boolean; result?: any; newIndex?: number } = { hit: false };
-
-                // Only use memoization for certain pattern types and when not in error recovery
-                const shouldUseMemo = this.shouldUseMemoization(pattern, parentRule);
-
-                if (shouldUseMemo) {
-                    memoResult = this.getMemoized(memoKey);
+                // Check memoization
+                if (memoKey) {
+                    const memoResult = this.getMemoized(memoKey);
                     if (memoResult.hit) {
                         this.index = memoResult.newIndex!;
                         this.silentContextStack.pop();
+                        this.log('verbose', `🔋 Memo HIT: ${memoKey} → ${memoResult.newIndex}`);
                         return memoResult.result;
                     }
                 }
 
-                // Update depth
                 this.indentLevel++;
-                this.log('patterns', `${'  '.repeat(this.indentLevel)}➤ ${pattern.type}${parentRule ? ` (${parentRule.name})` : ''}${shouldBeSilent ? ' [SILENT]' : ''} @${this.index}`);
+                this.log('patterns', `${'  '.repeat(this.indentLevel)}⚡ ${pattern.type}${parentRule ? ` (${parentRule.name})` : ''}${shouldBeSilent ? ' [SILENT]' : ''} @${this.index}`);
                 this.depth++;
 
-                // Parse pattern
                 let result: any = null;
 
                 try {
-                    // Skip ignored tokens
                     this.skipIgnored(parentRule?.options?.ignored);
 
-                    // Pass to pattern handler
-                    switch (pattern.type) {
-                        case 'token':
-                            result = this.parseToken(pattern.name, parentRule, shouldBeSilent);
-                            break;
-                        case 'rule':
-                            result = this.parseRule(pattern.name, parentRule, shouldBeSilent);
-                            break;
-                        case 'repeat':
-                            result = this.parseRepeat(pattern.pattern, pattern.min || 0, pattern.max || Infinity, pattern.separator, parentRule, shouldBeSilent);
-                            break;
-                        case 'seq':
-                            result = this.parseSequence(pattern.patterns, parentRule, shouldBeSilent);
-                            break;
-                        case 'choice':
-                            result = this.parseChoice(pattern.patterns, parentRule, shouldBeSilent);
-                            break;
-                        default:
-                            throw new Error(`Unknown pattern type: ${(pattern as any).type}`);
-                    }
+                    result = this.executePattern(pattern, parentRule, shouldBeSilent);
 
-                    // Log
                     const status = result !== null ? '✓' : '✗';
                     this.log('patterns', `${'  '.repeat(this.indentLevel)}${status} ${pattern.type} → ${this.index}`);
 
-                    // Memoize result (with conditions)
-                    if (shouldUseMemo) {
+                    // CRITICAL FIX: Only memoize if we're not in an error state
+                    if (memoKey && !isOptionalContext) {
                         this.memoize(memoKey, result, startIndex, this.index);
                     }
 
-                    // Return result
                     return result;
-                }
-                finally {
+                } catch (error) {
+                    // In optional context, don't let errors propagate up
+                    if (isOptionalContext) {
+                        this.index = startIndex;
+                        this.log('patterns', `${'  '.repeat(this.indentLevel)}✗ ${pattern.type} (optional context, suppressed) → ${startIndex}`);
+                        return null;
+                    }
+                    throw error;
+                } finally {
                     this.depth--;
                     this.indentLevel--;
                     this.silentContextStack.pop();
                 }
             }
 
-            private parseToken(tokenName: string, parentRule?: Rule, shouldBeSilent?: boolean): Token | null {
-                this.log('tokens', `→ ${tokenName} @${this.index}`);
+            private executePattern(pattern: Pattern, parentRule?: Rule, shouldBeSilent?: boolean): any {
+                switch (pattern.type) {
+                    case 'token':
+                        return this.parseToken(pattern.name, parentRule, shouldBeSilent);
+                    case 'rule':
+                        return this.parseRule(pattern.name, parentRule, shouldBeSilent);
+                    case 'repeat':
+                        return this.parseRepeat(pattern.pattern, pattern.min || 0, pattern.max || Infinity, pattern.separator, parentRule, shouldBeSilent);
+                    case 'seq':
+                        return this.parseSequence(pattern.patterns, parentRule, shouldBeSilent);
+                    case 'choice':
+                        return this.parseChoice(pattern.patterns, parentRule, shouldBeSilent);
+                    case 'optional':
+                        return this.parseOptional(pattern.pattern, parentRule);
+                    default:
+                        throw new Error(`Unknown pattern type: ${(pattern as any).type}`);
+                }
+            }
 
-                // EOF check
+            private parseToken(tokenName: string, parentRule?: Rule, shouldBeSilent?: boolean): Token | null {
+                this.lastHandledRule = parentRule?.name || tokenName;
+                this.log('tokens', `→ ${tokenName} @${this.index}`);
+                this.lastVisitedIndex = this.index;
+
                 if (this.index >= this.tokens.length) {
                     this.log('tokens', `✗ Expected '${tokenName}', got 'EOF' @${this.index}`);
 
-                    if (shouldBeSilent || this.isInSilentMode()) {
-                        return null;
-                    }
+                    if (shouldBeSilent) return null;
 
-                    const error = this.createError(0x001, `Expected '${tokenName}', got 'EOF'`, this.getCurrentSpan());
-                    this.handleParseError(error, parentRule, 0);
+                    const error = this.createError(
+                        ERRORS.TOKEN_EXPECTED_EOF,
+                        `Expected '${tokenName}', got 'EOF'`,
+                        this.getCurrentSpan(),
+                        0,
+                        this.index,
+                        this.lastHandledRule!,
+                        this.getInnerMostRule()
+                    );
+                    this.handleParseError(error, parentRule);
                 }
 
-                // Get current token
                 const token = this.getCurrentToken();
 
-                // Token matches - consume it
-                if (token.type === tokenName) {
+                if (token.kind === tokenName) {
                     const consumedToken = { ...token };
                     this.index++;
                     this.stats.tokensProcessed++;
-
                     this.log('tokens', `✓ ${tokenName} = "${token.value}" @${this.index - 1}`);
                     return consumedToken;
                 }
 
-                // Token doesn't match
-                this.log('tokens', `✗ Expected '${tokenName}', got '${token.type}' @${this.index}`);
+                this.log('tokens', `✗ Expected '${tokenName}', got '${token.kind}' @${this.lastVisitedIndex}`);
 
-                if (shouldBeSilent || this.isInSilentMode()) {
-                    return null;
-                }
+                if (shouldBeSilent) return null;
 
-                const error = this.createError(0x002, `Expected '${tokenName}', got '${token.type}'`, this.getCurrentSpan());
-                this.handleParseError(error, parentRule, 0);
+                const error = this.createError(
+                    ERRORS.TOKEN_MISMATCH,
+                    `Expected '${tokenName}', got '${token.kind}'`,
+                    this.getCurrentSpan(),
+                    0,
+                    this.lastVisitedIndex,
+                    this.lastHandledRule!,
+                    this.getInnerMostRule(true)
+                );
+                this.handleParseError(error, parentRule);
             }
 
             protected parseRule(ruleName: string, parentRule?: Rule, shouldBeSilent?: boolean): any {
-                this.log('rules', `→ ${ruleName} @${this.index}`);
+                this.lastHandledRule = ruleName;
+                this.ruleStack.push(ruleName);
+                this.patternStack.push('rule');
+                this.lastInnerRule = ruleName;
 
-                // Get the target rule by name
+                this.log('rules', `→ ${ruleName} @${this.index} [Stack: ${this.ruleStack.join(' → ')}]`);
+                this.lastVisitedIndex = this.index;
+
                 const targetRule = this.rules.get(ruleName);
                 if (!targetRule) {
+                    this.ruleStack.pop();
+                    this.patternStack.pop();
                     const error = new Error(`Rule '${ruleName}' not found`);
                     this.handleFatalError(error);
                     return null;
                 }
 
-                // Save current position for potential rollback
                 const startIndex = this.index;
                 const savedErrors = [...this.errors];
+                const savedSuccessfulRules = [...this.successfulRules];
 
                 try {
-                    // Stats
                     this.stats.rulesApplied++;
 
-                    // Parse the target rule's pattern
                     const result = this.parsePattern(targetRule.pattern, targetRule);
 
-                    // Handle null result
                     if (result === null) {
-                        if (shouldBeSilent || this.isInSilentMode()) {
-                            this.log('rules', `✗ ${ruleName} (silent) @${this.index}`);
+                        this.successfulRules = savedSuccessfulRules;
+
+                        if (shouldBeSilent) {
+                            this.log('rules', `✗ ${ruleName} (silent) @${this.lastVisitedIndex}`);
+                            this.ruleStack.pop();
+                            this.patternStack.pop();
                             return null;
                         }
 
-                        // Create error for failed rule
-                        const error = this.createError(0x003, `Rule '${ruleName}' failed to match`, this.getCurrentSpan());
-                        this.handleParseError(error, parentRule, 0);
+                        const error = this.createError(
+                            ERRORS.RULE_FAILED,
+                            `Rule '${ruleName}' failed to match`,
+                            this.getCurrentSpan(),
+                            0,
+                            this.lastVisitedIndex,
+                            this.lastHandledRule!,
+                            this.getInnerMostRule(true)
+                        );
+
+                        this.ruleStack.pop();
+                        this.patternStack.pop();
+                        this.handleParseError(error, parentRule);
                     }
 
-                    // Apply build function if available
                     let finalResult = result;
                     if (result !== null && targetRule.options?.build) {
                         finalResult = this.safeBuild(targetRule.options.build, result);
                     }
 
-                    this.log('rules', `✓ ${ruleName} @${this.index}`);
+                    this.log('rules', `✓ RULE → ${ruleName} @${this.lastVisitedIndex}`);
+
+                    // Track successful completion
+                    this.lastCompletedRule = ruleName;
+                    this.successfulRules.push(ruleName);
+                    this.globalSuccessRules.push(ruleName);
+
+                    this.updateLeafRule(ruleName);
+                    this.trimSuccessfulRules();
+
+                    this.ruleStack.pop();
+                    this.patternStack.pop();
                     return finalResult;
 
                 } catch (e) {
-                    // Rollback on error in silent mode
-                    if (shouldBeSilent || this.isInSilentMode()) {
+                    this.successfulRules = savedSuccessfulRules;
+                    this.ruleStack.pop();
+                    this.patternStack.pop();
+
+                    if (shouldBeSilent) {
                         this.index = startIndex;
                         this.errors = savedErrors;
                         return null;
                     }
 
-                    // Re-throw for error handling
-                    if(e instanceof Error) {
+                    if (e instanceof Error) {
                         this.handleFatalError(e);
                     } else {
-                        const error = this.createError((e as ParseError).code, (e as ParseError).msg, (e as ParseError).span);
-                        this.handleParseError(error, parentRule, 0);
+                        const error = this.createError(
+                            (e as ParseError).code,
+                            (e as ParseError).msg,
+                            (e as ParseError).span,
+                            (e as ParseError).failedAt,
+                            (e as ParseError).tokenIndex,
+                            (e as ParseError).prevRule,
+                            this.getInnerMostRule()
+                        );
+                        this.handleParseError(error, parentRule);
                     }
                 }
             }
 
+            private parseOptional(pattern: Pattern, parentRule?: Rule): any {
+                this.lastHandledRule = 'optional';
+                this.log('verbose', `OPTIONAL @${this.index}`);
+                this.lastVisitedIndex = this.index;
+
+                const startIndex = this.index;
+                const savedErrors = [...this.errors];
+
+                // ISSUE WAS HERE - The silent context was interfering with proper error handling
+                // We need to handle optional parsing more carefully
+
+                try {
+                    // Parse the pattern - but we need to be more careful about silent mode
+                    const result = this.parsePattern(pattern, parentRule);
+
+                    if (result !== null) {
+                        // Success case - return array with the result
+                        this.log('verbose', `✓ OPTIONAL → [1 element] @${this.index}`);
+                        return [result];
+                    } else {
+                        // Pattern returned null - this is a normal failure for optional
+                        // Reset to start position since we didn't consume anything useful
+                        this.index = startIndex;
+                        this.errors = savedErrors;
+                        this.log('verbose', `✓ OPTIONAL → [] (pattern returned null) @${this.index}`);
+                        return [];
+                    }
+                } catch (e) {
+                    // Exception thrown - reset state completely
+                    this.index = startIndex;
+                    this.errors = savedErrors;
+                    this.log('verbose', `✓ OPTIONAL → [] (exception caught: ${(e as any).msg || e}) @${this.index}`);
+                    return [];
+                }
+            }
+
             private parseRepeat(pattern: Pattern, min = 0, max = Infinity, separator?: Pattern, parentRule?: Rule, shouldBeSilent?: boolean): any {
+                this.lastHandledRule = pattern.type;
                 this.log('verbose', `REPEAT(${min}-${max}) @${this.index}`);
+                this.lastVisitedIndex = this.index;
 
                 const results: any[] = [];
+                let consecutiveFailures = 0;
                 const startIndex = this.index;
 
-                // Parse pattern iterations
                 while (results.length < max && this.index < this.tokens.length) {
                     const iterationStart = this.index;
                     const savedErrors = [...this.errors];
 
                     try {
-                        // Parse the main pattern
                         const result = this.parsePattern(pattern, parentRule);
 
-                        // Pattern failed
                         if (result === null) {
-                            // Restore errors state
                             this.errors = savedErrors;
 
-                            // Break if we can't recover or we're in silent/strict mode
-                            if (shouldBeSilent || this.isInSilentMode() || pattern.silent ||
-                                this.settings.errorRecovery!.mode === 'strict') {
+                            // FIXED: Better minimum requirement handling
+                            if (results.length >= min) {
+                                // We have enough results, break cleanly
                                 break;
-                            }
+                            } else if (shouldBeSilent || pattern.silent) {
+                                // Silent mode - break without error
+                                break;
+                            } else {
+                                // Not enough results and not silent - this is an error
+                                consecutiveFailures++;
+                                if (consecutiveFailures > 3) break;
 
-                            // Attempt recovery
-                            this.applyRecovery(parentRule, iterationStart);
-                            if (this.index === iterationStart) {
-                                break; // Recovery failed, avoid infinite loop
+                                // Try recovery if we have a recovery strategy
+                                if (parentRule?.options?.recovery) {
+                                    this.applyRecovery(parentRule, iterationStart);
+                                    if (this.index === iterationStart) {
+                                        this.index++; // Force progress
+                                    }
+                                    continue;
+                                } else {
+                                    // No recovery - break and let minimum check handle the error
+                                    break;
+                                }
                             }
-                            continue;
                         }
 
-                        // Pattern succeeded
+                        consecutiveFailures = 0;
                         results.push(result);
 
-                        // Prevent infinite loop
                         if (this.index === iterationStart) {
-                            this.log('verbose', `⚠ No progress in repeat, breaking @${this.index}`);
+                            this.log('verbose', `⚠️ No progress in repeat iteration, breaking @${this.index}`);
                             break;
                         }
 
-                        // Handle separator (only between elements, not after the last one)
+                        // Handle separator if needed
                         if (separator && results.length < max && this.index < this.tokens.length) {
                             const sepStart = this.index;
                             const sepSavedErrors = [...this.errors];
 
-                            // Parse separator in silent mode first to check availability
-                            const sepResult = this.parsePattern(separator, undefined);
-
-                            if (sepResult === null) {
-                                // Separator not found - this is the end of the repetition
+                            try {
+                                const sepResult = this.parsePattern(separator, undefined);
+                                if (sepResult === null) {
+                                    this.index = sepStart;
+                                    this.errors = sepSavedErrors;
+                                    break;
+                                }
+                            } catch (e) {
                                 this.index = sepStart;
                                 this.errors = sepSavedErrors;
                                 break;
                             }
-                            // Separator found - continue with next iteration
-                        } else if (separator && results.length >= max) {
-                            // We've reached max items, no more separators needed
-                            break;
                         }
 
                     } catch (e) {
-                        // Restore state
+                        consecutiveFailures++;
+
                         this.index = iterationStart;
                         this.errors = savedErrors;
 
-                        // Handle error based on mode
-                        if (shouldBeSilent || this.isInSilentMode()) {
+                        if (shouldBeSilent || results.length >= min) {
                             break;
                         }
 
-                        // In strict mode or if we haven't met minimum, this is a fatal error
-                        if (this.settings.errorRecovery!.mode === 'strict' || results.length < min) {
-                            if(e instanceof Error) {
-                                this.handleFatalError(e);
-                            } else {
-                                const error = this.createError((e as ParseError).code, (e as ParseError).msg, (e as ParseError).span);
-                                this.handleParseError(error, parentRule, 0);
-                            }
-                        }
-
-                        // Try recovery
-                        this.applyRecovery(parentRule, iterationStart);
-                        if (this.index === iterationStart) {
-                            this.index++; // Force progress
-                        }
+                        // FIXED: Let the pattern error propagate up instead of handling it here
+                        // This allows the proper error handling in the calling context
+                        throw e;
                     }
                 }
 
-                // Check minimum requirement
+                // FIXED: Check minimum requirement and create appropriate error
                 if (results.length < min) {
-                    const error = this.createError(
-                        0x005,
-                        `Expected at least ${min} occurrences, got ${results.length}`,
-                        this.getCurrentSpan()
-                    );
-
-                    if (shouldBeSilent || this.isInSilentMode()) {
+                    if (shouldBeSilent) {
                         return null;
                     }
 
-                    this.handleParseError(error, parentRule, 0);
+                    // Check if we should use a custom error from the parent rule
+                    if (parentRule?.options?.errors) {
+                        const customError = this.getCustomErrorForCondition(parentRule, 0, this.index, startIndex);
+                        if (customError) {
+                            throw customError;
+                        }
+                    }
+
+                    const error = this.createError(
+                        ERRORS.REPEAT_MIN_NOT_MET,
+                        `Expected at least ${min} occurrences, got ${results.length}`,
+                        this.getCurrentSpan(),
+                        0,
+                        this.index,
+                        this.lastHandledRule!
+                    );
+
+                    throw error;
                 }
 
                 this.log('verbose', `REPEAT → [${results.length}] @${this.index}`);
-                return results.length > 0 ? results : null;
+
+                if (results.length === 0) {
+                    return min === 0 ? [] : null;
+                }
+
+                return results.length === 1 && min === 1 && max === 1 ? results[0] : results;
             }
 
             private parseChoice(patterns: Pattern[], parentRule?: Rule, shouldBeSilent?: boolean): any {
                 this.log('verbose', `CHOICE[${patterns.length}] @${this.index}`);
+                this.lastVisitedIndex = this.index;
 
-                const startPosition = this.index;
+                const startIndex = this.index;
                 const savedErrors = [...this.errors];
-                let farthestIndex = this.index;
-                let farthestError: ParseError | null = null;
 
-                // Try each alternative
-                for (let i = 0; i < patterns.length; i++) {
-                    // Reset position for each attempt
-                    this.index = startPosition;
-                    this.errors = savedErrors;
+                let bestResult: {
+                    index: number;
+                    errors: ParseError[];
+                    span: Span;
+                    progress: number;
+                    patternIndex: number;
+                    failedAt: number;
+                } | null = null;
+
+                for (let patternIndex = 0; patternIndex < patterns.length; patternIndex++) {
+                    this.index = startIndex;
+                    this.errors = [...savedErrors];
 
                     try {
-                        // Parse alternative with silent context for choice alternatives
-                        const result = this.parsePattern(patterns[i], parentRule);
-
-                        // Success - return immediately
+                        const result = this.parsePattern(patterns[patternIndex], parentRule);
                         if (result !== null) {
-                            this.log('verbose', `CHOICE → alt ${i + 1}/${patterns.length} succeeded @${this.index}`);
+                            this.log('verbose', `✓ CHOICE → alt ${patternIndex + 1}/${patterns.length} succeeded @${this.lastVisitedIndex}`);
                             return result;
                         }
 
-                        // Track the farthest we progressed and collect errors
-                        if (this.index > farthestIndex) {
-                            farthestIndex = this.index;
-                            const newErrors = this.errors.slice(savedErrors.length);
-                            if (newErrors.length > 0) {
-                                farthestError = newErrors[newErrors.length - 1];
-                            }
-                        }
+                        const progress = this.lastVisitedIndex - startIndex;
+                        const currentErrors = this.errors.slice(savedErrors.length);
 
-                    } catch (error) {
-                        // Track farthest progress even on exceptions
-                        if (this.index > farthestIndex) {
-                            farthestIndex = this.index;
-                            farthestError = this.normalizeError(error, this.getCurrentSpan());
+                        this.log('verbose', `✗ CHOICE → alt ${patternIndex + 1} failed, errors=${currentErrors.length}, progress=${progress}`);
+
+                        if (!bestResult || progress > bestResult.progress || (progress === bestResult.progress && currentErrors.length > 0)) {
+                            bestResult = {
+                                index: this.index,
+                                errors: currentErrors,
+                                span: this.getCurrentSpan(),
+                                progress,
+                                patternIndex,
+                                failedAt: -1
+                            };
+                        }
+                    } catch (error: any) {
+                        const progress = this.lastVisitedIndex - startIndex;
+                        const normalizedError = this.normalizeError(error, this.getCurrentSpan());
+
+                        this.log('verbose', `✗ CHOICE → alt ${patternIndex + 1} threw error: ${normalizedError.msg}, progress=${progress}`);
+
+                        if (!bestResult || (progress >= bestResult.progress && error.failedAt > bestResult.failedAt)) {
+                            bestResult = {
+                                index: this.lastVisitedIndex,
+                                errors: [normalizedError],
+                                span: normalizedError.span,
+                                progress,
+                                patternIndex,
+                                failedAt: normalizedError.failedAt || -1
+                            };
                         }
                     }
                 }
 
                 // All alternatives failed
-                this.index = startPosition;
+                this.index = startIndex;
                 this.errors = savedErrors;
 
-                // In silent mode, just return null
-                if (shouldBeSilent || this.isInSilentMode()) {
-                    return null;
+                if (shouldBeSilent) return null;
+
+                if (bestResult) {
+                    const bestError = bestResult.errors.length > 0
+                        ? bestResult.errors[bestResult.errors.length - 1]
+                        : this.createError(
+                            ERRORS.CHOICE_ALL_FAILED,
+                            `Choice failed at alternative ${this.lastVisitedIndex + 1}`,
+                            bestResult.span,
+                            bestResult.failedAt,
+                            this.lastVisitedIndex,
+                            this.lastHandledRule!
+                        );
+
+                    this.log('verbose', `✗ All alternatives failed. Best: pattern ${this.lastVisitedIndex}, progress ${bestResult.progress}, failedAt ${bestResult.failedAt}, error: ${bestError.msg}`);
+                    throw bestError;
                 }
 
-                // Create meaningful error message
-                const errorMsg = farthestError
-                    ? `No matching alternative found: ${farthestError.msg}`
-                    // : `No matching pattern found in choice (tried ${patterns.length} alternatives)`;
-                    : `No matching pattern found in choice`;
-
                 const error = this.createError(
-                    farthestError?.code || 0x009,
-                    errorMsg,
-                    this.getCurrentSpan()
+                    ERRORS.CHOICE_ALL_FAILED,
+                    `Expected one of: ${patterns.map(p => this.patternToString(p)).join(', ')}`,
+                    this.getCurrentSpan(),
+                    0,
+                    this.lastVisitedIndex,
+                    this.lastHandledRule!
                 );
-
-                this.handleParseError(error, parentRule, 0);
+                throw error;
             }
 
             private parseSequence(patterns: Pattern[], parentRule?: Rule, shouldBeSilent?: boolean): any {
                 this.log('verbose', `SEQUENCE[${patterns.length}] @${this.index}`);
+                this.lastVisitedIndex = this.index;
 
-                // Empty sequence
-                if (patterns.length === 0) {
-                    return [];
-                }
+                if (patterns.length === 0) return [];
 
-                const startPosition = this.index;
+                const startIndex = this.index;
                 const savedErrors = [...this.errors];
                 const results: any[] = [];
                 let lastPatternIndex = 0;
 
                 try {
-                    // Parse each pattern in sequence
                     for (lastPatternIndex = 0; lastPatternIndex < patterns.length; lastPatternIndex++) {
                         const pattern = patterns[lastPatternIndex];
                         const beforePatternIndex = this.index;
 
-                        // Parse current pattern
                         const result = this.parsePattern(pattern, parentRule);
 
-                        // Pattern failed
                         if (result === null) {
-                            // In silent mode, rollback and return null
-                            if (shouldBeSilent || this.isInSilentMode()) {
-                                this.index = startPosition;
+                            if (shouldBeSilent) {
+                                this.index = startIndex;
                                 this.errors = savedErrors;
                                 return null;
                             }
 
-                            // Create descriptive error
                             const error = this.createError(
-                                0x006,
+                                ERRORS.SEQUENCE_FAILED,
                                 `Sequence failed at element ${lastPatternIndex + 1}/${patterns.length}`,
-                                this.getCurrentSpan()
+                                this.getCurrentSpan(),
+                                lastPatternIndex,
+                                this.lastVisitedIndex,
+                                this.lastHandledRule!
                             );
 
-                            this.handleParseError(error, parentRule, lastPatternIndex);
+                            this.handleParseError(error, parentRule);
                         }
 
-                        // Add result to sequence (maintain structure even for null results)
                         results.push(result);
 
-                        // Progress check (less strict for sequence since some patterns might not consume tokens)
                         if (this.index === beforePatternIndex && !pattern.silent) {
-                            this.log('verbose', `⚠ No progress at sequence element ${lastPatternIndex} @${this.index}`);
+                            this.log('verbose', `⚠️  No progress at sequence element ${lastPatternIndex} @${this.lastVisitedIndex}`);
                         }
 
-                        // Skip ignored tokens between sequence elements
                         this.skipIgnored(parentRule?.options?.ignored);
                     }
 
-                    // All patterns succeeded
-                    this.log('verbose', `SEQUENCE → [${results.length}] @${this.index}`);
+                    this.log('verbose', `SEQUENCE → [${results.length}] @${this.lastVisitedIndex}`);
                     return results;
 
                 } catch (e) {
-                    // Rollback on any error
-                    this.index = startPosition;
+                    this.index = startIndex;
                     this.errors = savedErrors;
 
-                    // Re-throw if not in silent mode
                     if (!shouldBeSilent && !this.isInSilentMode()) {
-                        if(e instanceof Error) {
+                        if (e instanceof Error) {
                             this.handleFatalError(e);
                         } else {
-                            const error = this.createError((e as ParseError).code, (e as ParseError).msg, (e as ParseError).span);
-                            this.handleParseError(error, parentRule, lastPatternIndex);
+                            const error = this.createError((e as ParseError).code, (e as ParseError).msg, (e as ParseError).span, lastPatternIndex, this.lastVisitedIndex, this.lastHandledRule!);
+                            this.handleParseError(error, parentRule);
                         }
                     }
 
@@ -770,21 +833,21 @@
             private safeBuild(buildFn: Function, matches: any): any {
                 try {
                     const input = Array.isArray(matches) ? matches : [matches];
-                    const result = buildFn(input);
-                    return result;
+                    return buildFn(input);
                 } catch (error) {
-                    // Only add build errors when not in silent mode
                     if (!this.isInSilentMode()) {
+                        console.error(`Build function failed: ${JSON.stringify(matches, null, 2)}, lastVisitedIndex: ${this.lastVisitedIndex}, lastHandledRule: ${this.lastHandledRule}`);
                         const buildError = this.createError(
-                            0x004,
+                            ERRORS.BUILD_FUNCTION_FAILED,
                             `Build function failed: ${(error as Error).message}`,
-                            this.getCurrentSpan()
+                            this.getCurrentSpan(),
+                            0,
+                            this.lastVisitedIndex,
+                            this.lastHandledRule!
                         );
                         this.addError(buildError);
                         this.log('errors', `Build error: ${(error as Error).message}`);
                     }
-
-                    // Return original matches as fallback
                     return matches;
                 }
             }
@@ -792,57 +855,40 @@
         // └────────────────────────────────────────────────────────────────────┘
 
 
-        // ┌─────────────────────────────── SILENT MODE ───────────────────────────────┐
+        // ┌──────────────────────────────── MODE ──────────────────────────────┐
 
             private shouldBeSilent(pattern: Pattern, rule?: Rule): boolean {
-                // Rule-level silent mode takes precedence
-                if (rule?.options?.silent === true) {
-                    return true;
-                }
-
-                // Pattern-level silent mode
-                if (pattern.silent === true) {
-                    return true;
-                }
-
-                // Inherit from parent context
-                if (this.silentContextStack.length > 0) {
-                    return this.silentContextStack[this.silentContextStack.length - 1];
-                }
-
-                return false;
+                return rule?.options?.silent === true ||
+                    pattern.silent === true ||
+                    (this.silentContextStack.length > 0 && this.silentContextStack[this.silentContextStack.length - 1]);
             }
 
             private isInSilentMode(): boolean {
                 return this.silentContextStack.length > 0 &&
-                       this.silentContextStack[this.silentContextStack.length - 1];
+                    this.silentContextStack[this.silentContextStack.length - 1];
             }
 
         // └────────────────────────────────────────────────────────────────────┘
 
 
-        // ┌─────────────────────────────── HELP ───────────────────────────────┐
+        // ┌──────────────────────────────── HELP ──────────────────────────────┐
 
-            private normalizeSettings(settings ?: ParserSettings): ParserSettings {
+            private normalizeSettings(settings?: ParserSettings): ParserSettings {
                 const defaultSettings: ParserSettings = {
-                    startRule           : 'root',
-                    errorRecovery       : {
-                        mode            : 'strict',
-                        maxErrors       : 1,
-                        syncTokens      : []
+                    startRule       : 'root',
+                    errorRecovery   : {
+                        mode        : 'strict',
+                        maxErrors   : 1,
                     },
-                    ignored             : ['ws'],
-                    debug               : 'off',
-                    maxDepth            : 1000,
-                    maxCacheSize        : 1,
+                    ignored         : ['ws'],
+                    debug           : 'off',
+                    maxDepth        : 1000,
+                    maxCacheSize    : 1, // 1 MB
                 };
 
-                if(!settings) {
-                    return defaultSettings;
-                }
+                if (!settings) return defaultSettings;
 
                 const mergedSettings = { ...defaultSettings, ...settings };
-
                 if (settings?.errorRecovery) {
                     mergedSettings.errorRecovery = { ...defaultSettings.errorRecovery, ...settings.errorRecovery };
                 }
@@ -883,15 +929,24 @@
                             refs.push(...this.extractRuleReferences(pattern.separator));
                         }
                         break;
+                    case 'optional':
+                        refs.push(...this.extractRuleReferences(pattern.pattern));
+                        break;
+                    case 'seq':
+                    case 'choice':
+                        if (pattern.patterns) {
+                            for (const p of pattern.patterns) {
+                                refs.push(...this.extractRuleReferences(p));
+                            }
+                        }
+                        break;
                 }
 
                 return refs;
             }
 
             private skipIgnored(ruleIgnored?: string[]): void {
-                if (this.ignoredSet.size === 0 && (!ruleIgnored?.length)) {
-                    return;
-                }
+                if (this.ignoredSet.size === 0 && (!ruleIgnored?.length)) return;
 
                 const combinedIgnored = ruleIgnored
                     ? new Set([...this.ignoredSet, ...ruleIgnored])
@@ -899,22 +954,24 @@
 
                 while (this.index < this.tokens.length) {
                     const token = this.tokens[this.index];
-                    if (!combinedIgnored.has(token.type)) break;
+                    if (!combinedIgnored.has(token.kind)) break;
                     this.index++;
                     this.stats.tokensProcessed++;
                 }
             }
 
             private skipUntilTokens(tokens: string[]): void {
+                if (tokens.length === 0) return;
+
                 const tokenSet = new Set(tokens);
-                const maxIterations = 10000;
+                const maxIterations = Math.min(10000, this.tokens.length - this.index);
                 let skipped = 0;
 
                 while (this.index < this.tokens.length && skipped < maxIterations) {
                     const currentToken = this.tokens[this.index];
 
-                    if (tokenSet.has(currentToken.type)) {
-                        this.log('errors', `Found sync token '${currentToken.type}' @${this.index}`);
+                    if (tokenSet.has(currentToken.kind)) {
+                        this.log('errors', `Found sync token '${currentToken.kind}' @${this.index}`);
                         return;
                     }
                     this.index++;
@@ -923,15 +980,9 @@
             }
 
             private deepClone(obj: any): any {
-                if (obj === null || typeof obj !== 'object') {
-                    return obj;
-                }
+                if (obj === null || typeof obj !== 'object') return obj;
+                if (Array.isArray(obj)) return obj.map(item => this.deepClone(item));
 
-                if (Array.isArray(obj)) {
-                    return obj.map(item => this.deepClone(item));
-                }
-
-                // Handle common AST node structure
                 if (obj.type || obj.span || obj.value) {
                     const cloned: any = {};
                     for (const [key, value] of Object.entries(obj)) {
@@ -944,34 +995,42 @@
             }
 
             private resetState(tokens: Token[]): void {
-                this.tokens             = tokens;
-                this.index              = 0;
-                this.errors             = [];
-                this.ast                = [];
-                this.depth              = 0;
-                this.errorSeq           = 0;
-                this.indentLevel        = 0;
-                this.silentContextStack = []; // Reset silent context
+                this.tokens = tokens;
+                this.index = 0;
+                this.errors = [];
+                this.ast = [];
+                this.depth = 0;
+                this.errorSeq = 0;
+                this.indentLevel = 0;
+                this.silentContextStack = [];
+
+                // Reset enhanced rule tracking
+                this.ruleStack = [];
+                this.patternStack = [];
+                this.lastInnerRule = 'unknown';
+                this.lastCompletedRule = 'unknown';
+                this.successfulRules = [];
+                this.globalSuccessRules = [];
+                this.lastLeafRule = 'unknown';
 
                 // Reset memoization
                 this.memoCache.clear();
-                this.memoHits           = 0;
-                this.memoMisses         = 0;
+                this.memoHits = 0;
+                this.memoMisses = 0;
 
-                this.stats              = {
-                    tokensProcessed     : 0,
-                    rulesApplied        : 0,
-                    errorsRecovered     : 0,
-                    parseTimeMs         : 0
+                this.stats = {
+                    tokensProcessed: 0,
+                    rulesApplied: 0,
+                    errorsRecovered: 0,
+                    parseTimeMs: 0
                 };
             }
 
-            private getCurrentToken() : Token {
+            private getCurrentToken(): Token {
                 return this.tokens[this.index];
             }
 
             private getCurrentSpan(): Span {
-                // Before any parsing
                 if (this.index === 0) {
                     if (this.tokens.length > 0) {
                         return {
@@ -982,9 +1041,7 @@
                     return { start: 0, end: 0 };
                 }
 
-                // After parsing - get the span of current position
                 if (this.index >= this.tokens.length) {
-                    // End of tokens - use last token's end
                     const lastToken = this.tokens[this.tokens.length - 1];
                     return {
                         start: lastToken.span.end,
@@ -992,21 +1049,48 @@
                     };
                 }
 
-                // Current token span
-                const currentToken = this.tokens[this.index];
-                return currentToken.span;
+                return this.tokens[this.index].span;
+            }
+
+            private patternToString(pattern: Pattern): string {
+                switch (pattern.type) {
+                    case 'token': return `'${pattern.name}'`;
+                    case 'rule': return pattern.name;
+                    case 'repeat': return `${this.patternToString(pattern.pattern)}...`;
+                    case 'optional': return `${this.patternToString(pattern.pattern)}?`;
+                    case 'choice': return `choice(${pattern.patterns.map((p: any) => this.patternToString(p)).join('|')})`;
+                    case 'seq': return `seq(${pattern.patterns.map((p: any) => this.patternToString(p)).join(' ')})`;
+                    default: return pattern.type;
+                }
+            }
+
+            private updateLeafRule(ruleName: string): void {
+                if (ruleName !== 'unknown' &&
+                    !ruleName.includes('<') &&
+                    !ruleName.includes('→') && (ruleName.length < 30) &&
+                    !['Statement', 'VariableDeclaration', 'let <mut> name;'].includes(ruleName)) {
+                    this.lastLeafRule = ruleName;
+                    this.log('verbose', `🍃 Updated lastLeafRule to: "${ruleName}"`);
+                }
+            }
+
+            private trimSuccessfulRules(): void {
+                if (this.successfulRules.length > 10) {
+                    this.successfulRules = this.successfulRules.slice(-5);
+                }
+                if (this.globalSuccessRules.length > 20) {
+                    this.globalSuccessRules = this.globalSuccessRules.slice(-10);
+                }
             }
 
             isNextToken(type: string, ignoredTokens?: string[]): boolean {
-                ignoredTokens = [...(ignoredTokens ?? []), ...this.settings.ignored!];
+                const ignored = [...(ignoredTokens ?? []), ...this.settings.ignored!];
                 let currentIndex = this.index;
 
                 while (currentIndex < this.tokens.length) {
                     const currentToken = this.tokens[currentIndex];
-                    if (currentToken.type == type) {
-                        return true;
-                    }
-                    if (ignoredTokens.includes(currentToken.type)) {
+                    if (currentToken.kind === type) return true;
+                    if (ignored.includes(currentToken.kind)) {
                         currentIndex++;
                     } else {
                         break;
@@ -1015,16 +1099,15 @@
                 return false;
             }
 
-            isPrevToken(type: string, ignoredTokens?: string[]): boolean {
-                ignoredTokens = [...(ignoredTokens ?? []), ...this.settings.ignored!];
-                let currentIndex = this.index - 1;
+            isPrevToken(type: string, startIndex: number = -1, ignoredTokens?: string[]): boolean {
+                if (startIndex === -1) startIndex = this.index > 0 ? this.index : 0;
+                const ignored = [...(ignoredTokens ?? []), ...this.settings.ignored!];
+                let currentIndex = startIndex - 1;
 
                 while (currentIndex >= 0) {
                     const currentToken = this.tokens[currentIndex];
-                    if (currentToken.type == type) {
-                        return true;
-                    }
-                    if (ignoredTokens.includes(currentToken.type)) {
+                    if (currentToken.kind === type) return true;
+                    if (ignored.includes(currentToken.kind)) {
                         currentIndex--;
                     } else {
                         break;
@@ -1033,76 +1116,63 @@
                 return false;
             }
 
+            isPrevRule(name: string): boolean {
+                console.warn(`isPrevRule: ${JSON.stringify(this.lastHandledRule, null, 2)}`);
+                return this.lastHandledRule === name;
+            }
+
         // └────────────────────────────────────────────────────────────────────┘
 
 
         // ┌─────────────────────────────── ERROR ──────────────────────────────┐
 
-            private createError(code: number, msg: string, span?: Span): ParseError {
+            private createError(code: number, msg: string, span: Span | undefined, failedAt: number, tokenIndex: number, prevRule: string, prevInnerRule?: string): ParseError {
                 return {
                     code,
                     msg,
-                    span: span || this.getCurrentSpan()
+                    span: span || this.getCurrentSpan(),
+                    failedAt,
+                    tokenIndex,
+                    prevRule,
+                    prevInnerRule: prevInnerRule || this.getInnerMostRule()
                 };
             }
 
-            private addError(error: ParseError): void {
-                // Don't add errors in silent mode
-                if (this.isInSilentMode()) {
-                    return;
-                }
+            private getCustomErrorOr(rule: Rule | null | undefined, defaultError: ParseError): ParseError {
+                if (!rule?.options?.errors) return defaultError;
 
-                // Check maximum error limit
-                const maxErrors = this.settings.errorRecovery!.maxErrors!;
-                if (maxErrors !== 0 && this.errors.length >= maxErrors) {
-                    return;
-                }
-
-                // In strict mode, only allow one error
-                if (this.settings.errorRecovery!.mode === 'strict' && this.errors.length > 0) {
-                    return;
-                }
-
-                this.errors.push(error);
-                this.log('errors', `⚠ ${error.msg} @${error.span.start}:${error.span.end}`);
-            }
-
-            private handleParseError(error: ParseError, rule?: Rule, failedAt: number = 0): never {
-                // Try to get custom error from rule
-                const finalError = this.getCustomErrorOr(rule, error, failedAt);
-                throw finalError;
-            }
-
-            private handleFatalError(error: any): void {
-                const parseError = this.normalizeError(error, this.getCurrentSpan());
-                this.addError(parseError);
-                this.log('errors', `💥 Fatal error: ${parseError.msg} @${this.index}`);
-            }
-
-            private getCustomErrorOr(rule: Rule | null | undefined, defaultError: ParseError, failedAt: number = 0): ParseError {
-                if (!rule?.options?.errors) {
-                    return defaultError;
-                }
-
-                // Try to find matching error handler
                 for (const errorHandler of rule.options.errors) {
                     let matches = false;
 
                     if (typeof errorHandler.cond === 'number') {
-                        matches = (failedAt === errorHandler.cond);
+                        matches = (defaultError.failedAt === errorHandler.cond);
                     } else if (typeof errorHandler.cond === 'function') {
                         try {
-                            matches = errorHandler.cond(this, failedAt, false);
-                        } catch {
+                            const contextualInnerRule = this.getInnerMostRule(true);
+
+                            const opt = {
+                                failedAt: defaultError.failedAt,
+                                tokenIndex: defaultError.tokenIndex,
+                                prevRule: defaultError.prevRule,
+                                prevInnerRule: contextualInnerRule
+                            };
+
+                            matches = errorHandler.cond(this, opt);
+                        } catch (err) {
+                            console.error('Error in condition function:', err);
                             matches = false;
                         }
                     }
 
                     if (matches) {
                         return this.createError(
-                            errorHandler.code || 0x007,
+                            errorHandler.code || ERRORS.CUSTOM_ERROR,
                             errorHandler.msg,
-                            defaultError.span
+                            defaultError.span,
+                            defaultError.failedAt,
+                            defaultError.tokenIndex,
+                            defaultError.prevRule,
+                            defaultError.prevInnerRule || this.getInnerMostRule(true)
                         );
                     }
                 }
@@ -1110,19 +1180,100 @@
                 return defaultError;
             }
 
+            private getInnerMostRule(forErrorCondition = false): string {
+                this.log('verbose', `📍 Rule context: stack=[${this.ruleStack.join(',')} as ${this.patternStack.join(',')}], recent=[${this.successfulRules.slice(-3).join(',')}], leaf=${this.lastLeafRule}, current=${this.lastHandledRule}`);
+
+                if (forErrorCondition && this.lastLeafRule !== 'unknown') {
+                    this.log('verbose', `🎯 getInnerMostRule(forErrorCondition=true) using lastLeafRule: "${this.lastLeafRule}"`);
+                    return this.lastLeafRule;
+                }
+
+                if (this.ruleStack.length > 0) {
+                    return this.ruleStack[this.ruleStack.length - 1];
+                }
+
+                if (this.lastLeafRule !== 'unknown') {
+                    return this.lastLeafRule;
+                }
+
+                // Look at most recently completed meaningful rule
+                const meaningfulRules = [...this.successfulRules, ...this.globalSuccessRules];
+                for (let i = meaningfulRules.length - 1; i >= 0; i--) {
+                    const rule = meaningfulRules[i];
+                    if (this.isMeaningfulRule(rule)) {
+                        return rule;
+                    }
+                }
+
+                if (this.lastCompletedRule !== 'unknown' && this.lastCompletedRule.length < 30) {
+                    return this.lastCompletedRule;
+                }
+
+                return this.lastInnerRule;
+            }
+
+            private isMeaningfulRule(rule: string): boolean {
+                return rule !== 'unknown' &&
+                    !rule.includes('<') &&
+                    !rule.includes('→') &&
+                    rule.length < 30 &&
+                    !['Statement', 'VariableDeclaration'].includes(rule);
+            }
+
+            private addError(error: ParseError): void {
+                if (this.isInSilentMode()) return;
+
+                const maxErrors = this.settings.errorRecovery!.maxErrors!;
+                if (maxErrors !== 0 && this.errors.length >= maxErrors) return;
+
+                if (this.settings.errorRecovery!.mode === 'strict' && this.errors.length > 0) return;
+
+                this.errors.push(error);
+                this.log('errors', `⚠️  ${error.msg} @${error.span.start}:${error.span.end}`);
+            }
+
+            private handleParseError(error: ParseError, rule?: Rule): never {
+                const finalError = this.getCustomErrorOr(rule, error);
+                throw finalError;
+            }
+
+            private handleFatalError(error: any): void {
+                const parseError = this.normalizeError(error, this.getCurrentSpan());
+                parseError.prevInnerRule = this.getInnerMostRule();
+                this.addError(parseError);
+                this.log('errors', `💥 Fatal error: ${parseError.msg} @${this.index}`);
+            }
+
             private normalizeError(error: any, defaultSpan: Span): ParseError {
-                // Already a ParseError
                 if (error && typeof error === 'object' && 'msg' in error && 'code' in error && 'span' in error) {
-                    return error as ParseError;
+                    const parseError = error as ParseError;
+                    if (!parseError.prevInnerRule) {
+                        parseError.prevInnerRule = this.getInnerMostRule();
+                    }
+                    return parseError;
                 }
 
-                // Regular Error
                 if (error instanceof Error) {
-                    return this.createError(0x404, error.message, defaultSpan);
+                    return this.createError(
+                        ERRORS.FATAL_ERROR,
+                        error.message,
+                        defaultSpan,
+                        0,
+                        this.lastVisitedIndex,
+                        this.lastHandledRule!,
+                        this.getInnerMostRule()
+                    );
                 }
 
-                // Unknown error type
-                return this.createError(0x500, `Unknown error: ${error}`, defaultSpan);
+                return this.createError(
+                    ERRORS.UNKNOWN_ERROR,
+                    `Unknown error: ${error}`,
+                    defaultSpan,
+                    0,
+                    this.lastVisitedIndex,
+                    this.lastHandledRule!,
+                    this.getInnerMostRule()
+                );
             }
 
             private applyRecovery(rule?: Rule, startIndex?: number): void {
@@ -1131,15 +1282,58 @@
                 if (recovery) {
                     this.applyRecoveryStrategy(recovery);
                 } else {
-                    this.defaultErrorRecovery();
+                    // FIXED: Only apply default recovery if no custom recovery is defined
+                    this.skipIgnored();
+                    if (this.index < this.tokens.length) {
+                        this.index++;
+                    }
                 }
 
                 this.stats.errorsRecovered++;
 
-                // Prevent infinite loops
+                // Ensure we make progress
                 if (startIndex !== undefined && this.index === startIndex && this.index < this.tokens.length) {
                     this.index++;
                 }
+            }
+
+            private getCustomErrorForCondition(rule: Rule, failedAt: number, tokenIndex: number, startIndex: number): ParseError | null {
+                if (!rule?.options?.errors) return null;
+
+                for (const errorHandler of rule.options.errors) {
+                    let matches = false;
+
+                    if (typeof errorHandler.cond === 'number') {
+                        matches = (failedAt === errorHandler.cond);
+                    } else if (typeof errorHandler.cond === 'function') {
+                        try {
+                            const opt = {
+                                failedAt,
+                                tokenIndex,
+                                prevRule: rule.name,
+                                prevInnerRule: this.getInnerMostRule(true)
+                            };
+                            matches = errorHandler.cond(this, opt);
+                        } catch (err) {
+                            console.error('Error in condition function:', err);
+                            matches = false;
+                        }
+                    }
+
+                    if (matches) {
+                        return this.createError(
+                            errorHandler.code || ERRORS.CUSTOM_ERROR,
+                            errorHandler.msg,
+                            this.getCurrentSpan(),
+                            failedAt,
+                            tokenIndex,
+                            rule.name,
+                            this.getInnerMostRule(true)
+                        );
+                    }
+                }
+
+                return null;
             }
 
             private applyRecoveryStrategy(strategy: RecoveryStrategy): void {
@@ -1147,31 +1341,17 @@
                 this.log('errors', `🔧 Recovery: ${strategy.type} @${beforePos}`);
 
                 switch (strategy.type) {
-                    case 'panic':
-                        this.defaultErrorRecovery();
-                        break;
                     case 'skipUntil':
                         const tokens = strategy.tokens || (strategy.token ? [strategy.token] : []);
                         this.skipUntilTokens(tokens);
                         break;
                     default:
-                        this.defaultErrorRecovery();
                 }
 
                 this.log('errors', `Recovery: ${beforePos} → ${this.index}`);
             }
 
-            private defaultErrorRecovery(): void {
-                const syncTokens = this.settings.errorRecovery!.syncTokens!;
-
-                if (syncTokens.length > 0) {
-                    this.skipUntilTokens(syncTokens);
-                } else if (this.index < this.tokens.length) {
-                    this.index++;
-                }
-            }
-
-        // └─────────────────────────────────────────────────────────────────────┘
+        // └────────────────────────────────────────────────────────────────────┘
 
 
         // ┌─────────────────────────────── DEBUG ──────────────────────────────┐
@@ -1190,7 +1370,7 @@
             }
 
             private getDebugPrefix(level: DebugLevel): string {
-                const prefixes: { [key: string]: string } = {
+                const prefixes: Record<string, string> = {
                     errors      : '🔥',
                     rules       : '📋',
                     patterns    : '🔍',
@@ -1210,37 +1390,28 @@
                 this.memoCache.clear();
                 this.rules.clear();
                 this.ignoredSet.clear();
-                this.tokens     = [];
-                this.ast        = [];
-                this.errors     = [];
+                this.tokens = [];
+                this.ast = [];
+                this.errors = [];
                 this.silentContextStack = [];
+                this.ruleStack = [];
+                this.successfulRules = [];
+                this.globalSuccessRules = [];
             }
 
             private cleanMemoCache(): void {
                 const entries = Array.from(this.memoCache.entries());
                 const now = Date.now();
 
-                // Remove old entries and invalid ones
-                const validEntries = entries.filter(([key, value]) => {
-                    // Remove entries older than 1 second (adjust as needed)
-                    if (now - (value.cachedAt || 0) > 1000) {
-                        return false;
-                    }
-
-                    // Remove entries that don't match current parsing context
-                    if (value.errorCount !== this.errors.length) {
-                        return false;
-                    }
-
+                const validEntries = entries.filter(([, value]) => {
+                    if (now - (value.cachedAt || 0) > 1000) return false;
+                    if (value.errorCount !== this.errors.length) return false;
                     return true;
                 });
 
-                // Keep only half of the valid entries (LRU-like)
                 const keepCount = Math.floor(validEntries.length / 2);
-
                 this.memoCache.clear();
 
-                // Keep the more recent entries
                 for (let i = validEntries.length - keepCount; i < validEntries.length; i++) {
                     this.memoCache.set(validEntries[i][0], validEntries[i][1]);
                 }
@@ -1249,31 +1420,25 @@
             }
 
             private createMemoKey(patternType: string, patternData: any, position: number, ruleName?: string): string {
-                // Include silent context in key
-                const silentContext = this.isInSilentMode() ? 'S' : 'L'; // S=Silent, L=Loud
-
-                // Include error recovery state (simplified)
+                const silentContext = this.isInSilentMode() ? 'S' : 'L';
                 const errorContext = this.errors.length > 0 ? `E${this.errors.length}` : 'E0';
-
-                // Create base key with context
                 const baseKey = `${patternType}:${position}:${silentContext}:${errorContext}`;
 
                 if (ruleName) {
-                    // For rules, include rule-specific context
                     const rule = this.rules.get(ruleName);
                     const ruleContext = this.getRuleContext(rule);
                     return `rule:${ruleName}:${ruleContext}:${baseKey}`;
                 }
 
-                // For patterns, include pattern-specific data
                 switch (patternType) {
                     case 'token':
                         return `${baseKey}:${patternData.name}`;
+                    case 'optional':
+                        return `${baseKey}:optional`;
                     case 'repeat':
                         return `${baseKey}:${patternData.min || 0}:${patternData.max || 'inf'}:${patternData.separator ? 'sep' : 'nosep'}`;
                     case 'seq':
                     case 'choice':
-                        // Include pattern count and a simple hash of pattern types
                         const patternHash = this.hashPatterns(patternData.patterns || []);
                         return `${baseKey}:${patternData.patterns?.length || 0}:${patternHash}`;
                     default:
@@ -1284,7 +1449,6 @@
             private getRuleContext(rule?: Rule): string {
                 if (!rule) return 'none';
 
-                // Create a simple hash of rule characteristics that affect parsing
                 const hasBuilder = rule.options?.build ? 'B' : '';
                 const hasErrors = rule.options?.errors?.length ? 'E' : '';
                 const hasRecovery = rule.options?.recovery ? 'R' : '';
@@ -1294,7 +1458,6 @@
             }
 
             private hashPatterns(patterns: Pattern[]): string {
-                // Simple hash based on pattern types and structure
                 return patterns.map(p => `${p.type}${p.silent ? 'S' : ''}`).join('');
             }
 
@@ -1305,13 +1468,11 @@
 
                 const cached = this.memoCache.get(key);
                 if (cached !== undefined) {
-                    // Additional validation: ensure the cached result is still valid
-                    if (this.isCachedResultValid(cached, key)) {
+                    if (this.isCachedResultValid(cached)) {
                         this.memoHits++;
-                        this.log('verbose', `🔋 Memo HIT: ${key} → ${cached.newIndex}`);
+                        this.log('verbose', `📋 Memo HIT: ${key} → ${cached.newIndex}`);
                         return { hit: true, result: cached.result, newIndex: cached.newIndex };
                     } else {
-                        // Invalid cached result, remove it
                         this.memoCache.delete(key);
                         this.log('verbose', `🗑️ Memo INVALID: ${key}`);
                     }
@@ -1321,152 +1482,82 @@
                 return { hit: false };
             }
 
-            private isCachedResultValid(cached: any, key: string): boolean {
-                // Basic sanity checks
-                if (typeof cached.newIndex !== 'number' || cached.newIndex < 0) {
-                    return false;
-                }
-
-                // Don't use cached results that would go beyond current token length
-                if (cached.newIndex > this.tokens.length) {
-                    return false;
-                }
-
-                // Additional checks can be added here based on your specific needs
+            private isCachedResultValid(cached: any): boolean {
+                if (typeof cached.newIndex !== 'number' || cached.newIndex < 0) return false;
+                if (cached.newIndex > this.tokens.length) return false;
                 return true;
             }
 
             private memoize(key: string, result: any, startIndex: number, endIndex: number): void {
-                if (!this.settings.maxCacheSize || this.memoCache.size >= this.settings.maxCacheSize) {
-                    return;
-                }
+                if (!this.settings.maxCacheSize || this.memoCache.size >= this.settings.maxCacheSize) return;
 
-                // Don't memoize results that made no progress and failed
-                // This prevents caching failed attempts that might succeed later
                 if (result === null && startIndex === endIndex) {
                     this.log('verbose', `⚠️ Skip memo (no progress): ${key}`);
                     return;
                 }
 
-                // Don't memoize if we're in an error recovery state
-                // Error recovery can change parsing behavior
                 if (this.errors.length > 0 && this.stats.errorsRecovered > 0) {
                     this.log('verbose', `⚠️ Skip memo (error state): ${key}`);
                     return;
                 }
 
-                // Clean cache if it gets too large
-                if (this.memoCache.size >= this.settings.maxCacheSize * 0.9) {
+                if (this.memoCache.size >= (this.settings.maxCacheSize * 0.9)) {
                     this.cleanMemoCache();
                 }
 
                 const memoEntry = {
-                    result: this.deepClone(result), // Clone to avoid reference issues
+                    result: this.deepClone(result),
                     newIndex: endIndex,
-                    // Store additional metadata for validation
                     cachedAt: Date.now(),
                     silentContext: this.isInSilentMode(),
                     errorCount: this.errors.length
                 };
 
                 this.memoCache.set(key, memoEntry);
-                this.log('verbose', `📝 Memo SET: ${key} → ${endIndex}`);
+                this.log('verbose', `💾 Memo SET: ${key} → ${endIndex}`);
             }
 
             private shouldUseMemoization(pattern: Pattern, parentRule?: Rule): boolean {
-                // Don't memoize during error recovery
-                if (this.stats.errorsRecovered > 0 && this.errors.length > 0) {
-                    return false;
-                }
+                if (this.stats.errorsRecovered > 0 && this.errors.length > 0) return false;
+                if (pattern.type === 'token') return false;
+                if (pattern.type === 'rule' && this.isRecursiveContext()) return false;
 
-                // Don't memoize for simple tokens (overhead not worth it)
-                if (pattern.type === 'token') {
-                    return false;
-                }
-
-                // Don't memoize recursive rules to avoid infinite loops
-                if (pattern.type === 'rule' && this.isRecursiveContext(pattern.name)) {
-                    return false;
-                }
-
-                // For complex patterns and rules, memoization is beneficial
                 return pattern.type === 'rule' ||
                     pattern.type === 'choice' ||
                     pattern.type === 'seq' ||
+                    pattern.type === 'optional' ||
                     (pattern.type === 'repeat' && (pattern.min > 1 || pattern.max > 1));
             }
 
-            private isRecursiveContext(ruleName: string): boolean {
-                // Simple check: if we're already parsing this rule in our call stack
-                // This is a basic implementation - you might need more sophisticated detection
-
-                // Count how many times this rule appears in current parsing context
-                // by checking if we're deeply nested in the same rule
-                return this.depth > 10; // Simple heuristic - adjust based on your grammar
+            private isRecursiveContext(): boolean {
+                return this.depth > 10;
             }
 
         // └────────────────────────────────────────────────────────────────────┘
-
     }
 
-// ╚══════════════════════════════════════════════════════════════════════════════════════════════╝
+// ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
 
 
-// ╔═══════════════════════════════════════════ MAIN ════════════════════════════════════════════╗
+// ╔════════════════════════════════════════ MAIN ════════════════════════════════════════╗
 
-    /**
-     * Parses an array of tokens using the provided rules and settings.
-     * @param tokens    - The array of tokens to parse.
-     * @param rules     - The set of rules to use for parsing.
-     * @param settings  - Additional settings to customize parsing behavior.
-     *
-     * @returns The result of the parsing operation, including the parsed AST and any errors encountered.
-    */
     export function parse(tokens: Token[], rules: Rules, settings?: ParserSettings): ParseResult {
-        // create new parser
         const parser = new Parser(rules, settings);
-
-        // parse
-        try     { return parser.parse(tokens); }
-        finally { parser.dispose(); }
+        try {
+            return parser.parse(tokens);
+        } finally {
+            parser.dispose();
+        }
     }
 
-    /**
-     * Creates a rule definition object.
-     * @param name      - The name of the rule.
-     * @param pattern   - The pattern to match against.
-     * @param options   - Additional options for the rule.
-     *
-     * @returns A rule definition object.
-     *
-     * @throws  Throws an error if `name` is falsy or not a string.
-     * @throws  Throws an error if `pattern` is falsy or not an object.
-     */
-    export function createRule(name: string, pattern: Pattern, options?: Rule['options']): Rule {
-        if (!name || typeof name !== 'string') {
-            throw new Error('Rule name must be a non-empty string');
-        }
-        if (!pattern || typeof pattern !== 'object') {
-            throw new Error('Rule pattern must be an object');
-        }
-        return { name, pattern, options };
-    }
+    export const createRule = ( name: string, pattern: Pattern, options: Rule['options'] = {} ): Rule => {
+        const finalOptions = { name, silent: false, ...options, };
+        return { name, pattern: pattern, options: finalOptions, };
+    };
 
+    // ●●●● Pattern Combinators ●●●●
 
-    // ════ Pattern Combinators ════
-
-
-    /**
-     * Creates a pattern that matches a specific token.
-     *
-     * @param {string} name             - The name of the token to match.
-     * @param {boolean} [silent=false]  - A flag that indicates whether the matched token should be ignored during parsing (silent mode).
-     *
-     * @returns {Pattern} The pattern object representing the token.
-     *
-     * @throws {Error} Throws an error if `name` is falsy or not a string.
-    */
     export function token(name: string, silent: boolean = false): Pattern {
         if (!name || typeof name !== 'string') {
             throw new Error('Token name must be a non-empty string');
@@ -1474,16 +1565,6 @@
         return { type: 'token', name, silent };
     }
 
-    /**
-     * Creates a new pattern that matches a rule definition.
-     *
-     * @param {string} name             - The name of the rule to match.
-     * @param {boolean} [silent=false]  - A flag that indicates whether the matched rule should be ignored during parsing (silent mode).
-     *
-     * @returns {Pattern} A pattern object that matches the specified rule.
-     *
-     * @throws {Error} Throws an error if `name` is falsy or not a string.
-    */
     export function rule(name: string, silent: boolean = false): Pattern {
         if (!name || typeof name !== 'string') {
             throw new Error('Rule name must be a non-empty string');
@@ -1491,19 +1572,6 @@
         return { type: 'rule', name, silent };
     }
 
-    /**
-     * Creates a new pattern that matches a specified number of occurrences of the given pattern.
-     *
-     * @param {Pattern} pattern         - The pattern to match.
-     * @param {number} [min=0]          - The minimum number of times the pattern must be matched.
-     * @param {number} [max=Infinity]   - The maximum number of times the pattern can be matched.
-     * @param {Pattern} [separator]     - A pattern to match between occurrences.
-     * @param {boolean} [silent=false]  - A flag that indicates whether the matched text should be hidden in the output.
-     *
-     * @returns {Pattern} A new pattern that matches between `min` and `max` occurrences of the given pattern.
-     *
-     * @throws {Error} Throws an error if `min` is negative or `max` is less than `min`.
-    */
     export function repeat(pattern: Pattern, min = 0, max = Infinity, separator?: Pattern, silent: boolean = false): Pattern {
         if (min < 0) {
             throw new Error('Minimum repetition count cannot be negative');
@@ -1514,100 +1582,25 @@
         return { type: 'repeat', pattern, min, max, separator, silent };
     }
 
-    /**
-     * Creates a new pattern that matches one or more occurrences of the given pattern.
-     *
-     * @param {Pattern} pattern         - The pattern to match one or more times.
-     * @param {Pattern} [separator]     - A pattern to match between occurrences.
-     * @param {boolean} [silent=false]  - A flag that indicates whether the matched text should be hidden in the output.
-     *
-     * @return {Pattern} A new pattern that matches one or more occurrences of the given pattern.
-    */
     export function oneOrMore(pattern: Pattern, separator?: Pattern, silent: boolean = false): Pattern {
         return repeat(pattern, 1, Infinity, separator, silent);
     }
 
-    /**
-     * Creates a new pattern that matches zero or more occurrences of the given pattern.
-     *
-     * @param {Pattern} pattern         - The pattern to match zero or more times.
-     * @param {Pattern} [separator]     - A pattern to match between occurrences.
-     * @param {boolean} [silent=false]  - A flag that indicates whether the matched text should be hidden in the output.
-     *
-     * @return {Pattern} A new pattern that matches zero or more occurrences of the given pattern.
-    */
     export function zeroOrMore(pattern: Pattern, separator?: Pattern, silent: boolean = false): Pattern {
         return repeat(pattern, 0, Infinity, separator, silent);
     }
 
-    /**
-     * Creates a new pattern that matches zero or one occurrence of the given pattern.
-     *
-     * @param {Pattern} pattern         - The pattern to match zero or one time.
-     * @param {Pattern} [separator]     - A pattern to match between occurrences.
-     * @param {boolean} [silent=true]   - A flag that indicates whether the matched text should be hidden in the output.
-     *
-     * @return {Pattern} A new pattern that matches zero or one occurrence of the given pattern.
-    */
     export function zeroOrOne(pattern: Pattern, separator?: Pattern, silent: boolean = true): Pattern {
         return repeat(pattern, 0, 1, separator, silent);
     }
 
-    /**
-     * Matches a single occurrence of the given pattern. If the pattern fails to match, it will return an array with
-     * a single error. This is useful when you want to ensure that a pattern is matched once and only once, and if it
-     * fails to match, you want to return a specific error.
-     *
-     * @param {Pattern} pattern         - The pattern to match.
-     * @param {boolean} [silent=false]  - Whether the pattern should be silent (not fail on error).
-     *
-     * @return {Pattern} A pattern that matches the given pattern exactly once.
-     *
-     * @example
-     * // Example usage of errorOrArrayOfOne:
-     * parser.createRule('Expression',
-     *     parser.errorOrArrayOfOne(parser.silent(parser.rule('PrimaryExpression'))),
-     *     {
-     *         build: (matches) => {
-     *             return {
-     *                 kind    : 'Expression',
-     *                 span    : matches[0] && matches[0].span ? matches[0].span : { start: 0, end: 0 },
-     *                 body    : matches[0]
-     *             };
-     *         },
-     *
-     *         silent: false,
-     *
-     *         errors: [parser.error(0, "Expected Expression")],
-     *     }
-     * ),
-     *
-     * // If the pattern fails to match, it will return just one error: "Expected Expression".
-    */
-    export function errorOrArrayOfOne(pattern: Pattern, silent: boolean = false): Pattern {
-        return repeat(pattern, 1, 1, undefined, silent);
+    export function optional(pattern: Pattern, silent: boolean = false): Pattern {
+        if (!pattern || typeof pattern !== 'object') {
+            throw new Error('Optional pattern must be a valid pattern');
+        }
+        return { type: 'optional', pattern, silent };
     }
 
-    /**
-     * Creates a new pattern that matches zero or one occurrence of the given pattern.
-     *
-     * @param {Pattern} pattern     - The pattern to match zero or one time.
-     *
-     * @return {Pattern} A new pattern that matches zero or one occurrence of the given pattern.
-    */
-    export function optional(pattern: Pattern): Pattern {
-        return repeat(pattern, 0, 1, undefined, true);
-    }
-
-    /**
-     * Creates a new pattern that matches one of multiple patterns. Throws an error if the choice has no patterns.
-     *
-     * @param {...Pattern} patterns     - The patterns to match, at least one is required.
-     *
-     * @return {Pattern} A new pattern that matches one of the given patterns.
-     *
-     * @throws {Error} Throws an error if the choice has no patterns.
-     */
     export function choice(...patterns: Pattern[]): Pattern {
         if (patterns.length === 0) {
             throw new Error('Choice must have at least one pattern');
@@ -1615,15 +1608,6 @@
         return { type: 'choice', patterns, silent: false };
     }
 
-    /**
-     * Creates a new pattern that matches multiple patterns in sequence. Throws an error if the sequence has no patterns.
-     *
-     * @param {...Pattern} patterns     - The patterns to match in sequence.
-     *
-     * @return {Pattern} A new pattern that matches the given patterns in sequence.
-     *
-     * @throws {Error} Throws an error if the sequence has no patterns.
-    */
     export function seq(...patterns: Pattern[]): Pattern {
         if (patterns.length === 0) {
             throw new Error('Sequence must have at least one pattern');
@@ -1631,100 +1615,33 @@
         return { type: 'seq', patterns, silent: false };
     }
 
+    // ●●●● Silent Mode Helpers ●●●●
 
-    // ════ Silent Mode Helpers ════
-
-
-    /**
-     * Creates a new pattern that matches the given pattern but is not outputted
-     * in the AST.
-     *
-     * @param {Pattern} pattern     - The pattern to match but not output.
-     *
-     * @return {Pattern} A new pattern that matches the given pattern but is not
-     * outputted in the AST.
-     */
     export function silent<T extends Pattern>(pattern: T): T {
         return { ...pattern, silent: true };
     }
 
-    /**
-     * Creates a new pattern that matches the given pattern and is outputted in
-     * the AST.
-     *
-     * @param {Pattern} pattern     - The pattern to match and output.
-     *
-     * @return {Pattern} A new pattern that matches the given pattern and is
-     * outputted in the AST.
-     */
     export function loud<T extends Pattern>(pattern: T): T {
         return { ...pattern, silent: false };
     }
 
+    // ●●●● Error Handling ●●●●
 
-    // ════ Error Handling ════
-
-
-    /**
-     * Creates a new ErrorHandler pattern that matches when the given condition is true
-     * and throws an error with the given message and code.
-     *
-     * @param {ErrorHandler['cond']} cond   - The condition function that determines if the error should be thrown.
-     * @param {string} msg                  - The error message to throw.
-     * @param {number} [code=0x999]         - The error code to throw.
-     *
-     * @return {ErrorHandler} A new ErrorHandler pattern that matches the given condition and throws an error.
-     */
-    export function error( cond: ErrorHandler['cond'], msg: string, code?: number, ): ErrorHandler {
-        return { cond, msg, code: code ?? 0x999 };
+    export function error(cond: ErrorHandler['cond'], msg: string, code?: number): ErrorHandler {
+        return { cond, msg, code: code ?? ERRORS.RECOVERY_CUSTOM };
     }
 
-    /**
-     * A collection of error recovery strategies.
-     *
-     * @type {Object}
-     * @property {RecoveryStrategy} panicMode - Creates a recovery strategy that stops parsing and throws an error with code 0xAAA.
-     * @property {RecoveryStrategy} skipUntil - Creates a recovery strategy that skips input tokens until it finds any of the given tokens.
-    */
     export const errorRecoveryStrategies = {
-        /**
-         * Creates a recovery strategy that stops parsing and throws an error with code 0xAAA.
-         *
-         * @return {RecoveryStrategy} A recovery strategy that stops parsing.
-         */
-        panicMode(): RecoveryStrategy {
-            return { type: 'panic' };
-        },
-
-        /**
-         * Creates a recovery strategy that skips input tokens until it finds any of the given tokens.
-         *
-         * @param {string | string[]} tokens - The tokens to skip until.
-         * @return {RecoveryStrategy} A recovery strategy that skips input tokens until it finds any of the given tokens.
-         */
         skipUntil(tokens: string | string[]): RecoveryStrategy {
             return { type: 'skipUntil', tokens: Array.isArray(tokens) ? tokens : [tokens] };
         },
     };
 
+    // ●●●● Helpers ●●●●
 
-    // ════ Helpers ════
-
-
-    /**
-     * Returns the smallest span that encompasses all the given matches, or the span of the first match
-     * if there are no matches.
-     *
-     * @param {any[]} matches - An array of matches each containing a span property.
-     *
-     * @return {Span | undefined} The smallest span that encompasses all the given matches, or the span
-     * of the first match if there are no matches.
-     */
     export function getMatchesSpan(matches: any[]): Span {
-        const default_span = { start: 0, end: 0};
-        if (!matches || matches.length === 0) {
-            return default_span;
-        }
+        const default_span = { start: 0, end: 0 };
+        if (!matches || matches.length === 0) return default_span;
 
         let firstSpan: Span | null = null;
         let lastSpan: Span | null = null;
@@ -1752,17 +1669,19 @@
         return default_span;
     }
 
-    /**
-     * Returns a new object that is a shallow copy of the given 'res' object, but without the 'span' property.
-     *
-     * @param {any} res - An object to be copied, with any 'span' property removed.
-     *
-     * @return {any} A new object that is a shallow copy of the given 'res' object, but without the 'span' property.
-     */
     export function resWithoutSpan(res: any): any {
         const result = { ...res };
         delete result.span;
         return result;
     }
 
-// ╚══════════════════════════════════════════════════════════════════════════════════════════════╝
+    export function isOptionalPassed(res: any[]) : boolean {
+        return res.length > 0;
+    }
+
+    export function getOptional(res: any[], ret: any = undefined, index: number = 0) : any {
+        if(!isOptionalPassed(res)) return ret;
+        return res[index];
+    }
+
+// ╚══════════════════════════════════════════════════════════════════════════════════════╝

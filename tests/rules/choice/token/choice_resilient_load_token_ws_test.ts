@@ -32,7 +32,7 @@
                     value   : matches[0]
                 }),
 
-                // recovery: parser.errorRecoveryStrategies.skipUntil(['ok', 'fk']),
+                recovery: parser.errorRecoveryStrategies.skipUntil(['ok', 'fk']),
 
                 silent: false
             }
@@ -47,7 +47,6 @@
         errorRecovery       : {
             mode            : 'resilient',      // 'strict' | 'resilient'
             maxErrors       : 0,                // Stop after N errors (0 = unlimited)
-            syncTokens      : ['ok', 'fk']                // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens
@@ -70,7 +69,7 @@
                     rule: 'rootChoice',
                     span: { start: 0, end: 2 },
                     value: {
-                        type: 'ok',
+                        kind: 'ok',
                         span: { start: 0, end: 2 },
                         value: 'ok'
                     }
@@ -84,7 +83,7 @@
                     rule: 'rootChoice',
                     span: { start: 0, end: 2 },
                     value: {
-                        type: 'ok',
+                        kind: 'ok',
                         span: { start: 0, end: 2 },
                         value: 'ok'
                     }
@@ -93,7 +92,7 @@
                     rule: 'rootChoice',
                     span: { start: 3, end: 5 },
                     value: {
-                        type: 'fk',
+                        kind: 'fk',
                         span: { start: 3, end: 5 },
                         value: 'fk'
                     }
@@ -119,8 +118,8 @@
             input: 'notOk',
             ast: [],
             errors: [{
-                    code: 9,
-                    msg: "No matching pattern found in choice",
+                    code: 2,
+                    msg: "Expected 'fk', got 'notOk'",
                     span: { start: 0, end: 0 }
                 }]
         },

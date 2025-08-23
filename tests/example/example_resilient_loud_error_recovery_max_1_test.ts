@@ -81,6 +81,7 @@
                 ],
 
                 silent: false,
+                recovery: parser.errorRecoveryStrategies.skipUntil('open')
 
                 // Example: `(+2... (3+4)`
                 // An error occurs after the first `(` due to a missing left operand.
@@ -102,7 +103,6 @@
         errorRecovery       : {
             mode            : 'resilient',      // 'strict' | 'resilient'
             maxErrors       : 1,                // Stop after N errors (0 = unlimited)
-            syncTokens      : ['open']          // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens

@@ -31,7 +31,7 @@
                     value   : matches[0]
                 }),
 
-                // recovery: parser.errorRecoveryStrategies.skipUntil(['ok', 'fk']),
+                recovery: parser.errorRecoveryStrategies.skipUntil(['ok', 'fk']),
 
                 silent: true
             }
@@ -46,7 +46,6 @@
         errorRecovery       : {
             mode            : 'resilient',      // 'strict' | 'resilient'
             maxErrors       : 0,                // Stop after N errors (0 = unlimited)
-            syncTokens      : ['ok', 'fk']                // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens
@@ -69,7 +68,7 @@
                     rule: 'rootChoice',
                     span: { start: 0, end: 2 },
                     value: {
-                        type: 'ok',
+                        kind: 'ok',
                         span: { start: 0, end: 2 },
                         value: 'ok'
                     }
@@ -83,7 +82,7 @@
                     rule: 'rootChoice',
                     span: { start: 0, end: 2 },
                     value: {
-                        type: 'ok',
+                        kind: 'ok',
                         span: { start: 0, end: 2 },
                         value: 'ok'
                     }

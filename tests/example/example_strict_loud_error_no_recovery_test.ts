@@ -83,7 +83,7 @@
                 //
                 // Note: In `resilient` mode, the parser halts at the first `(`,
                 // capturing a single error before returning.
-                // recovery: parser.errorRecoveryStrategies.skipUntil('open')
+                recovery: parser.errorRecoveryStrategies.skipUntil('open')
             }
         ),
     ];
@@ -96,7 +96,6 @@
         errorRecovery       : {
             mode            : 'strict',      // 'strict' | 'resilient'
             maxErrors       : 1,                // Stop after N errors (0 = unlimited)
-            syncTokens      : []          // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens

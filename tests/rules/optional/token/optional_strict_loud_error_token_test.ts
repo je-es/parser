@@ -28,7 +28,7 @@
                 build: (matches) => ({
                     rule    : 'rootOptional',
                     span    : matches.length ? { start: matches[0].span.start, end: matches[matches.length-1].span.end } : { start: 0, end: 0 },
-                    value   : matches
+                    value   : matches.length ? matches : []
                 }),
 
                 errors: [
@@ -48,7 +48,6 @@
         errorRecovery       : {
             mode            : 'strict',      // 'strict' | 'resilient'
             maxErrors       : 1,                // Stop after N errors (0 = unlimited)
-            syncTokens      : []                // Tokens to sync on during recovery
         },
 
         ignored             : ['ws'],           // Ignore whitespace tokens
@@ -70,13 +69,11 @@
                 {
                     rule: 'rootOptional',
                     span: { start: 0, end: 2 },
-                    value: [
-                        {
-                            type: 'ok',
-                            span: { start: 0, end: 2 },
-                            value: 'ok'
-                        }
-                    ]
+                    value: [{
+                        kind: 'ok',
+                        span: { start: 0, end: 2 },
+                        value: 'ok'
+                    }]
                 }
             ]
         },
@@ -86,13 +83,16 @@
                 {
                     rule: 'rootOptional',
                     span: { start: 0, end: 2 },
-                    value: [
-                        {
-                            type: 'ok',
-                            span: { start: 0, end: 2 },
-                            value: 'ok'
-                        },
-                    ]
+                    value: [{
+                        kind: 'ok',
+                        span: { start: 0, end: 2 },
+                        value: 'ok'
+                    }],
+                },
+                {
+                    rule: 'rootOptional',
+                    span: { start: 0, end: 0 },
+                    value: []
                 }
             ]
         },
@@ -111,7 +111,13 @@
 
         "notOk" : {
             input: 'notOk',
-            ast: [],
+            ast: [
+                {
+                    rule: 'rootOptional',
+                    span: { start: 0, end: 0 },
+                    value: []
+                }
+            ],
             errors: []
         },
     };
