@@ -506,7 +506,6 @@ import * as parser from '@je-es/parser';
   - ##### [@je-es/syntax](https://github.com/je-es/syntax)
       > Unified wrapper that streamlines syntax creation with integrated lexer-parser coordination, LSP support, and enhanced linting capabilities.
 
-
   - ##### [@je-es/program](https://github.com/je-es/program)
       > A high-performance, type-safe program representation library with advanced semantic analysis for programming languages.
 
