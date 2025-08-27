@@ -1287,8 +1287,9 @@ function resWithoutSpan(res) {
 function isOptionalPassed(res) {
   return res.length > 0;
 }
-function getOptional(res, ret = void 0, index = 0) {
+function getOptional(res, ret = void 0, index = 0, isSeq = false) {
   if (!isOptionalPassed(res)) return ret;
+  if (isSeq && Array.isArray(res)) res = res[0];
   return res[index];
 }
 // Annotate the CommonJS export names for ESM import in node:

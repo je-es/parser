@@ -1,6 +1,6 @@
 {
 	"name": "@je-es/parser",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"description": "Advanced syntax analyzer that converts tokens into AST with customizable grammar rules and intelligent error detection.",
 	"keywords": [
 		"je-es",

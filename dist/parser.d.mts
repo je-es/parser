@@ -192,6 +192,6 @@ declare const errorRecoveryStrategies: {
 declare function getMatchesSpan(matches: any[]): Span;
 declare function resWithoutSpan(res: any): any;
 declare function isOptionalPassed(res: any[]): boolean;
-declare function getOptional(res: any[], ret?: any, index?: number): any;
+declare function getOptional(res: any[], ret?: any, index?: number, isSeq?: boolean): any;
 
 export { type AstNode, type BaseAstNode, type DebugLevel, ERRORS, type ErrorHandler, type ParseError, type ParseResult, type ParseStatistics, Parser, type ParserSettings, type Pattern, type RecoveryStrategy, type Rule, type Rules, type Span, type Token, choice, createRule, error, errorRecoveryStrategies, getMatchesSpan, getOptional, isOptionalPassed, loud, oneOrMore, optional, parse, repeat, resWithoutSpan, rule, seq, silent, token, zeroOrMore, zeroOrOne };

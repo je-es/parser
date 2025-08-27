@@ -1679,8 +1679,9 @@
         return res.length > 0;
     }
 
-    export function getOptional(res: any[], ret: any = undefined, index: number = 0) : any {
+    export function getOptional(res: any[], ret: any = undefined, index: number = 0, isSeq: boolean = false) : any {
         if(!isOptionalPassed(res)) return ret;
+        if(isSeq && Array.isArray(res)) res = res[0];
         return res[index];
     }
 
