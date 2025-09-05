@@ -20,22 +20,22 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 
 // lib/parser.ts
 var ERRORS = {
-  // Core parsing errors (0x000 - 0x099)
-  LEXICAL_ERROR: 0,
-  TOKEN_EXPECTED_EOF: 1,
-  TOKEN_MISMATCH: 2,
-  RULE_FAILED: 3,
-  BUILD_FUNCTION_FAILED: 4,
-  REPEAT_MIN_NOT_MET: 5,
-  SEQUENCE_FAILED: 6,
-  CUSTOM_ERROR: 7,
-  // Choice and alternatives (0x008 - 0x00F)
-  CHOICE_ALL_FAILED: 9,
-  // System errors (0x400 - 0x4FF)
-  FATAL_ERROR: 1028,
-  UNKNOWN_ERROR: 1280,
-  // Recovery and validation (0x900 - 0x999)
-  RECOVERY_CUSTOM: 2457
+  // Core parsing errors
+  LEXICAL_ERROR: "LEXICAL_ERROR",
+  TOKEN_EXPECTED_EOF: "TOKEN_EXPECTED_EOF",
+  TOKEN_MISMATCH: "TOKEN_MISMATCH",
+  RULE_FAILED: "RULE_FAILED",
+  BUILD_FUNCTION_FAILED: "BUILD_FUNCTION_FAILED",
+  REPEAT_MIN_NOT_MET: "REPEAT_MIN_NOT_MET",
+  SEQUENCE_FAILED: "SEQUENCE_FAILED",
+  CUSTOM_ERROR: "CUSTOM_ERROR",
+  // Choice and alternatives
+  CHOICE_ALL_FAILED: "CHOICE_ALL_FAILED",
+  // System errors
+  FATAL_ERROR: "FATAL_ERROR",
+  UNKNOWN_ERROR: "UNKNOWN_ERROR",
+  // Recovery and validation
+  RECOVERY_CUSTOM: "RECOVERY_CUSTOM"
 };
 var Parser = class {
   constructor(rules, settings) {

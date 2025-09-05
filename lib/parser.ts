@@ -30,7 +30,7 @@
     export interface ErrorHandler {
         cond            : number | ((parser: Parser, opt: { failedAt: number, tokenIndex: number, force?: boolean, prevRule?: string, prevInnerRule?: string }) => boolean);
         msg             : string;
-        code?           : number;
+        code?           : string;
     }
 
     export interface RecoveryStrategy {
@@ -70,7 +70,7 @@
 
     export interface ParseError {
         msg             : string;
-        code            : number;
+        code            : string;
         span            : Span;
         failedAt        : number;
         tokenIndex      : number;
@@ -99,25 +99,25 @@
     }
 
     export const ERRORS = {
-        // Core parsing errors (0x000 - 0x099)
-        LEXICAL_ERROR           : 0x000,
-        TOKEN_EXPECTED_EOF      : 0x001,
-        TOKEN_MISMATCH          : 0x002,
-        RULE_FAILED             : 0x003,
-        BUILD_FUNCTION_FAILED   : 0x004,
-        REPEAT_MIN_NOT_MET      : 0x005,
-        SEQUENCE_FAILED         : 0x006,
-        CUSTOM_ERROR            : 0x007,
+        // Core parsing errors
+        LEXICAL_ERROR           : 'LEXICAL_ERROR',
+        TOKEN_EXPECTED_EOF      : 'TOKEN_EXPECTED_EOF',
+        TOKEN_MISMATCH          : 'TOKEN_MISMATCH',
+        RULE_FAILED             : 'RULE_FAILED',
+        BUILD_FUNCTION_FAILED   : 'BUILD_FUNCTION_FAILED',
+        REPEAT_MIN_NOT_MET      : 'REPEAT_MIN_NOT_MET',
+        SEQUENCE_FAILED         : 'SEQUENCE_FAILED',
+        CUSTOM_ERROR            : 'CUSTOM_ERROR',
 
-        // Choice and alternatives (0x008 - 0x00F)
-        CHOICE_ALL_FAILED       : 0x009,
+        // Choice and alternatives
+        CHOICE_ALL_FAILED       : 'CHOICE_ALL_FAILED',
 
-        // System errors (0x400 - 0x4FF)
-        FATAL_ERROR             : 0x404,
-        UNKNOWN_ERROR           : 0x500,
+        // System errors
+        FATAL_ERROR             : 'FATAL_ERROR',
+        UNKNOWN_ERROR           : 'UNKNOWN_ERROR',
 
-        // Recovery and validation (0x900 - 0x999)
-        RECOVERY_CUSTOM         : 0x999,
+        // Recovery and validation
+        RECOVERY_CUSTOM         : 'RECOVERY_CUSTOM',
     } as const;
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
@@ -1126,7 +1126,7 @@
 
         // ┌─────────────────────────────── ERROR ──────────────────────────────┐
 
-            private createError(code: number, msg: string, span: Span | undefined, failedAt: number, tokenIndex: number, prevRule: string, prevInnerRule?: string): ParseError {
+            private createError(code: string, msg: string, span: Span | undefined, failedAt: number, tokenIndex: number, prevRule: string, prevInnerRule?: string): ParseError {
                 return {
                     code,
                     msg,
@@ -1627,7 +1627,7 @@
 
     // ●●●● Error Handling ●●●●
 
-    export function error(cond: ErrorHandler['cond'], msg: string, code?: number): ErrorHandler {
+    export function error(cond: ErrorHandler['cond'], msg: string, code?: string): ErrorHandler {
         return { cond, msg, code: code ?? ERRORS.RECOVERY_CUSTOM };
     }
 

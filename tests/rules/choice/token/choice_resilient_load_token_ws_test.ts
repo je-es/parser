@@ -107,7 +107,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token 'k'",
                     span: { start: 3, end: 3 }
                 }
@@ -118,7 +118,7 @@
             input: 'notOk',
             ast: [],
             errors: [{
-                    code: 2,
+                    code: "TOKEN_MISMATCH",
                     msg: "Expected 'fk', got 'notOk'",
                     span: { start: 0, end: 0 }
                 }]

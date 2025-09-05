@@ -73,11 +73,11 @@
                 }),
 
                 errors: [
-                    parser.error(0, "Expected opening parenthesis '('", 111),
-                    parser.error(1, "Expected left operand", 222 ),
-                    parser.error(2, "Expected operator", 333 ),
-                    parser.error(3, "Expected right operand", 444 ),
-                    parser.error(4, "Expected closing parenthesis ')'", 555 ),
+                    parser.error(0, "Expected opening parenthesis '('", "GROUP_ERROR_MISSING_OPEN"),
+                    parser.error(1, "Expected left operand", "GROUP_ERROR_MISSING_LEFT"),
+                    parser.error(2, "Expected operator", "GROUP_ERROR_MISSING_OPERATOR"),
+                    parser.error(3, "Expected right operand", "GROUP_ERROR_MISSING_RIGHT"),
+                    parser.error(4, "Expected closing parenthesis ')'", "GROUP_ERROR_MISSING_CLOSE"),
                 ],
 
                 silent: false,
@@ -148,7 +148,7 @@
             input: '(1+2',
             errors: [
                 {
-                    code    : 555,
+                    code    : "GROUP_ERROR_MISSING_CLOSE",
                     msg     : "Expected closing parenthesis ')'",
                     span    : { start: 4, end: 4 }
                 }
@@ -170,7 +170,7 @@
             ],
             errors: [
                 {
-                    code    : 222,
+                    code    : "GROUP_ERROR_MISSING_LEFT",
                     msg     : "Expected left operand",
                     span    : { start: 1, end: 2 }
                 }

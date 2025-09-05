@@ -114,7 +114,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token ' '",
                     span: { start: 2, end: 2 }
                 }

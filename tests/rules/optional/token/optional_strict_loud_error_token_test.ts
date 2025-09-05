@@ -32,7 +32,7 @@
                 }),
 
                 errors: [
-                    parser.error(0, 'Something!', 78788) // Will Never Happend (Optional/Repeat[0/1])
+                    parser.error(0, 'Something!', "ERROR_CODE_00000") // Will Never Happend (Optional/Repeat[0/1])
                 ],
 
                 silent: false
@@ -102,7 +102,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token ' '",
                     span: { start: 2, end: 2 }
                 }

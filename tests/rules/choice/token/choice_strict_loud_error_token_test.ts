@@ -33,7 +33,7 @@
                 }),
 
                 errors: [
-                    parser.error(0, 'Expected "ok" or "fk"', 65656),
+                    parser.error(0, 'Expected "ok" or "fk"', "ERROR_CODE_00000"),
                 ],
 
                 silent: false
@@ -107,7 +107,7 @@
             ],
             errors: [
                 {
-                    code: 65656,
+                    code: "ERROR_CODE_00000",
                     msg: 'Expected "ok" or "fk"',
                     span: { start: 2, end: 3 }
                 }
@@ -119,7 +119,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token ' '",
                     span: { start: 2, end: 2 }
                 }
@@ -131,7 +131,7 @@
             ast: [],
             errors: [
                 {
-                    code: 65656,
+                    code: "ERROR_CODE_00000",
                     msg: 'Expected "ok" or "fk"',
                     span: { start: 0, end: 0 }
                 }

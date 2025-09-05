@@ -94,11 +94,11 @@ import * as parser from '@je-es/parser';
                 }),
 
                 errors: [
-                    parser.error(0, "Expected opening parenthesis '('", 111),
-                    parser.error(1, "Expected left operand", 222),
-                    parser.error(2, "Expected operator", 333),
-                    parser.error(3, "Expected right operand", 444),
-                    parser.error(4, "Expected closing parenthesis ')'", 555),
+                    parser.error(0, "Expected opening parenthesis '('", "GROUP_ERROR_MISSING_OPEN"),
+                    parser.error(1, "Expected left operand", "GROUP_ERROR_MISSING_LEFT"),
+                    parser.error(2, "Expected operator", "GROUP_ERROR_MISSING_OPERATOR"),
+                    parser.error(3, "Expected right operand", "GROUP_ERROR_MISSING_RIGHT"),
+                    parser.error(4, "Expected closing parenthesis ')'", "GROUP_ERROR_MISSING_CLOSE"),
                 ],
 
                 silent: false,
@@ -199,12 +199,12 @@ import * as parser from '@je-es/parser';
             "ast": [],
             "errors":[
                 {
-                    "code"    : 555,
+                    "code"    : "GROUP_ERROR_MISSING_CLOSE",
                     "msg"     : "Expected closing parenthesis ')'",
                     "span"    : { "start": 4, "end": 4 }
                 },
                 {
-                    "code"    : 111,
+                    "code"    : "GROUP_ERROR_MISSING_OPEN",
                     "msg"     : "Expected opening parenthesis '('",
                     "span"    : { "start": 1, "end": 2 }
                 }
@@ -232,12 +232,12 @@ import * as parser from '@je-es/parser';
             ],
             "errors": [
                 {
-                    "code"          : 222,
+                    "code"          : "GROUP_ERROR_MISSING_LEFT",
                     "msg"           : "Expected left operand",
                     "span"          : { "start": 1, "end": 2 }
                 },
                 {
-                    "code"          : 111,
+                    "code"          : "GROUP_ERROR_MISSING_OPEN",
                     "msg"           : "Expected opening parenthesis '('",
                     "span"          : { "start": 1, "end": 2 }
                 }
@@ -412,7 +412,7 @@ import * as parser from '@je-es/parser';
     interface ErrorHandler {
         cond            : number | ((parser: Parser, failedAt: number, force?: boolean) => boolean);
         msg             : string;
-        code           ?: number;
+        code           ?: string;
     }
 
     // Represents a recovery strategy
@@ -460,7 +460,7 @@ import * as parser from '@je-es/parser';
 
     interface ParseError {
         msg             : string;
-        code            : number;
+        code            : string;
         span            : Span;
     }
 

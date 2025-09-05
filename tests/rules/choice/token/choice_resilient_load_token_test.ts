@@ -100,7 +100,7 @@
             ],
             errors: [
                 {
-                    code: 2,
+                    code: "TOKEN_MISMATCH",
                     msg: "Expected 'fk', got 'sep'",
                     span: { start: 2, end: 3 }
                 }
@@ -112,7 +112,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token ' '",
                     span: { start: 2, end: 2 }
                 }
@@ -123,7 +123,7 @@
             input: 'notOk',
             ast: [],
             errors: [{
-                    code: 2,
+                    code: "TOKEN_MISMATCH",
                     msg: "Expected 'fk', got 'notOk'",
                     span: { start: 0, end: 0 }
                 }]

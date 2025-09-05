@@ -67,7 +67,7 @@
             ast: [],
             errors: [
                 {
-                    code: 1,
+                    code: "TOKEN_EXPECTED_EOF",
                     msg: "Expected 'fk', got 'EOF'",
                     span: {
                         start: 2,
@@ -104,7 +104,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token 'k'",
                     span: { start: 3, end: 3 }
                 }
@@ -116,7 +116,7 @@
             ast: [],
             errors: [
                 {
-                    code: 2,
+                    code: "TOKEN_MISMATCH",
                     msg: "Expected 'ok', got 'notOk'",
                     span: { start: 0, end: 0 }
                 }

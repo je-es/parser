@@ -97,7 +97,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token 'k'",
                     span: { start: 3, end: 3 }
                 }

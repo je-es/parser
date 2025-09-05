@@ -32,7 +32,7 @@
                 }),
 
                 errors: [
-                    parser.error(0, 'BlahBlah', 5454)
+                    parser.error(0, 'BlahBlah', "ERROR_CODE_00000")
                 ],
 
                 silent: false
@@ -106,7 +106,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token ' '",
                     span: { start: 2, end: 2 }
                 }
@@ -118,7 +118,7 @@
             ast: [],
             errors: [
                 {
-                    code: 5454,
+                    code: "ERROR_CODE_00000",
                     msg: `BlahBlah`,
                     span: {start: 0, end: 0 },
                 }

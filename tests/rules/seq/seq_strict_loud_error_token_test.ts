@@ -34,7 +34,7 @@
                 }),
 
                 errors: [
-                    parser.error(0, `Expected 'ok' + 'fk'`, 7898789),
+                    parser.error(0, `Expected 'ok' + 'fk'`, "ERROR_CODE_00001"),
                 ],
 
                 silent: false
@@ -70,7 +70,7 @@
             ast: [],
             errors: [
                 {
-                    code: 7898789,
+                    code: "ERROR_CODE_00001",
                     msg: `Expected 'ok' + 'fk'`,
                     span: {
                         start: 2,
@@ -106,7 +106,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token 'k'",
                     span: { start: 3, end: 3 }
                 }
@@ -118,7 +118,7 @@
             ast: [],
             errors: [
                 {
-                    code: 7898789,
+                    code: "ERROR_CODE_00001",
                     msg: `Expected 'ok' + 'fk'`,
                     span: { start: 0, end: 0 }
                 }

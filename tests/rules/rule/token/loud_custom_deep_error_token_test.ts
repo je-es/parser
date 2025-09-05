@@ -31,7 +31,7 @@
                 }),
 
                 errors: [
-                    parser.error(0, "Expected ok from rule parent", 0x666)
+                    parser.error(0, "Expected ok from rule parent", "ERROR_CODE_00000")
                 ],
 
                 silent: false
@@ -47,7 +47,7 @@
                 }),
 
                 errors: [
-                    parser.error(0, "Expected ok", 0x555)
+                    parser.error(0, "Expected ok", "ERROR_CODE_00001")
                 ],
 
                 silent: false
@@ -98,7 +98,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token ' '",
                     span: { start: 2, end: 2 }
                 }
@@ -110,7 +110,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x666,
+                    code: "ERROR_CODE_00000",
                     msg: `Expected ok from rule parent`,
                     // FAILD LOOK HERE
                     // -     "code": 1638,

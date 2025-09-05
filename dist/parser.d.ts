@@ -21,7 +21,7 @@ interface ErrorHandler {
         prevInnerRule?: string;
     }) => boolean);
     msg: string;
-    code?: number;
+    code?: string;
 }
 interface RecoveryStrategy {
     type: 'skipUntil';
@@ -54,7 +54,7 @@ type BaseAstNode = {
 type AstNode = BaseAstNode | any;
 interface ParseError {
     msg: string;
-    code: number;
+    code: string;
     span: Span;
     failedAt: number;
     tokenIndex: number;
@@ -79,18 +79,18 @@ interface ParserSettings {
     maxCacheSize?: number;
 }
 declare const ERRORS: {
-    readonly LEXICAL_ERROR: 0;
-    readonly TOKEN_EXPECTED_EOF: 1;
-    readonly TOKEN_MISMATCH: 2;
-    readonly RULE_FAILED: 3;
-    readonly BUILD_FUNCTION_FAILED: 4;
-    readonly REPEAT_MIN_NOT_MET: 5;
-    readonly SEQUENCE_FAILED: 6;
-    readonly CUSTOM_ERROR: 7;
-    readonly CHOICE_ALL_FAILED: 9;
-    readonly FATAL_ERROR: 1028;
-    readonly UNKNOWN_ERROR: 1280;
-    readonly RECOVERY_CUSTOM: 2457;
+    readonly LEXICAL_ERROR: "LEXICAL_ERROR";
+    readonly TOKEN_EXPECTED_EOF: "TOKEN_EXPECTED_EOF";
+    readonly TOKEN_MISMATCH: "TOKEN_MISMATCH";
+    readonly RULE_FAILED: "RULE_FAILED";
+    readonly BUILD_FUNCTION_FAILED: "BUILD_FUNCTION_FAILED";
+    readonly REPEAT_MIN_NOT_MET: "REPEAT_MIN_NOT_MET";
+    readonly SEQUENCE_FAILED: "SEQUENCE_FAILED";
+    readonly CUSTOM_ERROR: "CUSTOM_ERROR";
+    readonly CHOICE_ALL_FAILED: "CHOICE_ALL_FAILED";
+    readonly FATAL_ERROR: "FATAL_ERROR";
+    readonly UNKNOWN_ERROR: "UNKNOWN_ERROR";
+    readonly RECOVERY_CUSTOM: "RECOVERY_CUSTOM";
 };
 declare class Parser {
     rules: Map<string, Rule>;
@@ -185,7 +185,7 @@ declare function choice(...patterns: Pattern[]): Pattern;
 declare function seq(...patterns: Pattern[]): Pattern;
 declare function silent<T extends Pattern>(pattern: T): T;
 declare function loud<T extends Pattern>(pattern: T): T;
-declare function error(cond: ErrorHandler['cond'], msg: string, code?: number): ErrorHandler;
+declare function error(cond: ErrorHandler['cond'], msg: string, code?: string): ErrorHandler;
 declare const errorRecoveryStrategies: {
     skipUntil(tokens: string | string[]): RecoveryStrategy;
 };

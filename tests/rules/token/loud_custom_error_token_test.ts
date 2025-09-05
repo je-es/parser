@@ -31,7 +31,7 @@
                 }),
 
                 errors: [
-                    parser.error(0, "Expected ok", 0x555)
+                    parser.error(0, "Expected ok", "ERROR_CODE_00001")
                 ],
 
                 silent: false
@@ -78,7 +78,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x000,
+                    code: "LEXICAL_ERROR",
                     msg: "Unexpected token ' '",
                     span: { start: 2, end: 2 }
                 }
@@ -90,7 +90,7 @@
             ast: [],
             errors: [
                 {
-                    code: 0x555,
+                    code: "ERROR_CODE_00001",
                     msg: `Expected ok`,
                     span: { start: 0, end: 0 }
                 }
