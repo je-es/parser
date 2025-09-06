@@ -15,7 +15,7 @@
 // ╔════════════════════════════════════════ TYPE ════════════════════════════════════════╗
 
     export type ResultStatus        = 'unset' | 'failed' | 'passed';
-    export type ResultMode          = 'unset' | 'token' | 'optional' | 'choice' | 'repeat' | 'seq';
+    export type ResultMode          = 'unset' | 'token' | 'optional' | 'choice' | 'repeat' | 'seq' | 'custom';
 
     export interface TokenSource {
         source_kind     : 'token-source';
@@ -50,7 +50,14 @@
         result          : Result[];
     }
 
-    export type ResultSource = TokenSource | OptionalSource | ChoiceSource | RepeatSource | SequenceSource | null;
+    export interface CustomSource {
+        source_kind     : 'custom-source',
+
+        tag             : string;
+        data            : unknown;
+    }
+
+    export type ResultSource = TokenSource | OptionalSource | ChoiceSource | RepeatSource | SequenceSource | CustomSource | null;
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
@@ -63,6 +70,7 @@
         // ┌──────────────────────────────── INIT ──────────────────────────────┐
 
             // Core data
+            public span         : Types.Span            = { start: -1, end: -1 };
             public status       : ResultStatus          = 'unset';
             public source       : ResultSource          = null;
             public mode         : ResultMode            = 'unset';
@@ -70,10 +78,11 @@
 
 
             // Initialization
-            constructor(status?: ResultStatus, source?: ResultSource, mode?: ResultMode) {
-                this.status             = status ?? 'unset';
-                this.source             = source ?? null;
+            constructor(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Types.Span) {
+                this.status     = status ?? 'unset';
+                this.source     = source ?? null;
                 this.mode       = mode ?? 'unset';
+                this.span       = span ?? { start: -1, end: -1 };
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -94,8 +103,8 @@
                 return res;
             }
 
-            static create(status?: ResultStatus, source?: ResultSource, mode?: ResultMode) : Result {
-                return new Result(status, source, mode);
+            static create(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Types.Span) : Result {
+                return new Result(status, source, mode, span);
             }
 
             static createAsToken(status?: ResultStatus, source?: Types.Token) : Result {
@@ -105,7 +114,7 @@
                     value       : source?.value ?? undefined,
                     span        : source?.span  ?? undefined,
                 };
-                return Result.create(status, newSource, 'token');
+                return Result.create(status, newSource, 'token', newSource.span);
             }
 
             static createAsOptional(status?: ResultStatus, source?: Result) : Result {
@@ -114,7 +123,7 @@
                     result      : source ?? null
                 };
 
-                return Result.create(status, newSource, 'optional');
+                return Result.create(status, newSource, 'optional', source?.span);
             }
 
             static createAsChoice(status?: ResultStatus, source?: Result, index?: number) : Result {
@@ -124,7 +133,7 @@
                     result      : source ?? null
                 };
 
-                return Result.create(status, newSource, 'choice');
+                return Result.create(status, newSource, 'choice', source?.span);
             }
 
             static createAsRepeat(status?: ResultStatus, source?: Result[]) : Result {
@@ -133,7 +142,11 @@
                     result      : source ?? []
                 };
 
-                return Result.create(status, newSource, 'repeat');
+                const full_span : Types.Span = { start: -1, end: -1 };
+                full_span.start = source && source.length ? source[0].span.start : -1;
+                full_span.end = source && source.length ? source[source.length-1].span.end : -1;
+
+                return Result.create(status, newSource, 'repeat', full_span);
             }
 
             static createAsSequence(status?: ResultStatus, source?: Result[]) : Result {
@@ -142,7 +155,20 @@
                     result      : source ?? []
                 };
 
-                return Result.create(status, newSource, 'seq');
+                const full_span : Types.Span = { start: -1, end: -1 };
+                full_span.start = source && source.length ? source[0].span.start : -1;
+                full_span.end = source && source.length ? source[source.length-1].span.end : -1;
+                return Result.create(status, newSource, 'seq', full_span);
+            }
+
+            static createAsCustom(status?: ResultStatus, name?: string, data?: unknown, span?: Types.Span) : Result {
+                const newSource : CustomSource = {
+                    source_kind : 'custom-source',
+                    tag        : name ?? '',
+                    data        : data ?? null
+                };
+
+                return Result.create(status, newSource, 'custom', span);
             }
 
             withError(err: Types.ParseError) : Result {
@@ -157,6 +183,12 @@
 
             isPassed() : boolean {
                 return this.status === 'passed';
+            }
+
+            isFullyPassed() : boolean {
+                if(!this.isPassed()) return false;
+                if(this.isOptional() && !this.isOptionalMatched()) return false;
+                return true;
             }
 
             isFailed() : boolean {
@@ -189,6 +221,10 @@
 
             isSequence() : boolean {
                 return this.mode === 'seq';
+            }
+
+            isCustom() : boolean {
+                return this.mode === 'custom';
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -287,6 +323,14 @@
             getSequenceResult() : Result[] | undefined {
                 if(this.isSequence()) {
                     return (this.source as SequenceSource).result;
+                }
+
+                return undefined;
+            }
+
+            getCustomData() : unknown | undefined {
+                if(this.isCustom()) {
+                    return (this.source as CustomSource).data;
                 }
 
                 return undefined;

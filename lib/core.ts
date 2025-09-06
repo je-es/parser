@@ -75,11 +75,6 @@
 
         // ┌──────────────────────────────── MAIN ──────────────────────────────┐
 
-            static hanldeErrorSpan(span: Types.Span) : Types.Span {
-                if(span.start === span.end) { span.end +=1; }
-                return span;
-            }
-
             parse(tokens: Types.Token[]): Types.ParseResult {
                 this.resetState(tokens);
                 this.startTime = Date.now();
@@ -337,7 +332,7 @@
 
                     const result = this.parsePattern(targetRule.pattern, targetRule);
 
-                    if (result.isFailed()) {
+                    if (!result.isFullyPassed()) {
                         this.successfulRules = savedSuccessfulRules;
 
                         if (shouldBeSilent) {
@@ -417,7 +412,7 @@
                     // Parse the pattern - but we need to be more careful about silent mode
                     const result : Result = this.parsePattern(pattern, parentRule);
 
-                    if (result.isPassed()) {
+                    if (result.isFullyPassed()) {
                         // Success case - return array with the result
                         this.log('verbose', `✓ OPTIONAL → [1 element] @${this.index}`);
 
@@ -464,7 +459,7 @@
 
                     try {
                         const result = this.parsePattern(patterns[patternIndex], parentRule);
-                        if (result.isPassed()) {
+                        if (result.isFullyPassed()) {
                             this.log('verbose', `✓ CHOICE → alt ${patternIndex + 1}/${patterns.length} succeeded @${this.lastVisitedIndex}`);
                             return Result.createAsChoice('passed', result, patternIndex);
                         }
@@ -552,7 +547,7 @@
                     try {
                         const result = this.parsePattern(pattern, parentRule);
 
-                        if (result === null) {
+                        if (!result.isFullyPassed()) {
                             this.errors = savedErrors;
 
                             // Better minimum requirement handling
@@ -597,7 +592,7 @@
 
                             try {
                                 const sepResult = this.parsePattern(separator, undefined);
-                                if (sepResult === null) {
+                                if (!sepResult.isFullyPassed()) {
                                     this.index  = sepStart;
                                     this.errors = sepSavedErrors;
                                     break;
@@ -672,7 +667,7 @@
 
                         const result = this.parsePattern(pattern, parentRule);
 
-                        if (result === null) {
+                        if (!result.isFullyPassed()) {
                             if (shouldBeSilent) {
                                 this.index  = startIndex;
                                 this.errors = savedErrors;
@@ -1000,6 +995,11 @@
 
         // ┌─────────────────────────────── ERROR ──────────────────────────────┐
 
+            static hanldeErrorSpan(span: Types.Span) : Types.Span {
+                if(span.start === span.end) { span.end +=1; }
+                return span;
+            }
+
             private createError(code: string, msg: string, span: Types.Span | undefined, failedAt: number, tokenIndex: number, prevRule: string, prevInnerRule?: string): Types.ParseError {
                 return {
                     code,
@@ -1307,6 +1307,7 @@
             private createMemoKey(pattern: Types.Pattern, position: number, ruleName?: string): string {
                 const silentContext = this.isInSilentMode() ? 'S' : 'L';
                 const errorContext = this.errors.length > 0 ? `E${this.errors.length}` : 'E0';
+                
                 const baseKey = `${pattern.type}:${position}:${silentContext}:${errorContext}`;
 
                 if (ruleName) {
@@ -1376,7 +1377,7 @@
             private memoize(key: string, result: Result, startIndex: number, endIndex: number): void {
                 if (!this.settings.maxCacheSize || this.memoCache.size >= this.settings.maxCacheSize) {return;}
 
-                if (result === null && startIndex === endIndex) {
+                if (!result.isFullyPassed() && startIndex === endIndex) {
                     this.log('verbose', `⚠️ Skip memo (no progress): ${key}`);
                     return;
                 }

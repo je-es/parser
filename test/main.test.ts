@@ -336,7 +336,7 @@
                 const input = ';';
                 const tokens = lexer.tokenize(input, tokensRules);
                 const res = parser.parse(tokens, parserRules, parserSettings);
-                console.log(JSON.stringify(res, null ,2));
+                // console.log(JSON.stringify(res, null ,2));
                 expect(res.ast.length).toEqual(0);
 
                 expect(res.errors).toEqual([{

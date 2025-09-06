@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // kemet.rules.ts
 //
 // Developed with ❤️ by Maysara.
@@ -7,10 +6,10 @@
 
 // ╔════════════════════════════════════════ PACK ════════════════════════════════════════╗
 
-    import * as parser                                  from '../../../lib/parser';
+    import * as parser                                  from '../../lib/parser';
     import * as lexer                                   from '@je-es/lexer';
-    import * as syntax                                  from './libs/syntax/syntax';
-    import { StatementRules }                           from './base/Statement';
+    import * as syntax                                  from '../libs/syntax/syntax';
+    // import { StatementRules }                           from './base/Statement';
     // import { TypeRules }                                from './base/Type';
     import { ExpressionRules }                          from './base/Expression';
 
@@ -85,6 +84,8 @@
         auto            : ['auto'],
 
         // ═══ Operators ═══
+        'and'           : 'and',
+        'or'            : 'or',
         '=>'            : '=>', // Variable Assign Block Prefix
         '->'            : '->', // Function Return Prefix
         '.*'            : '.*', // Dereference Suffix
@@ -103,10 +104,6 @@
         '--'            : '--',
         '<<'            : '<<',
         '>>'            : '>>',
-        'and'           : 'and',
-        'or'            : 'or',
-        // '&&'            : '&&',
-        // '||'            : '||',
         '<'             : '<',
         '>'             : '>',
         '|'             : '|',
@@ -137,27 +134,26 @@
     };
 
     // ════════ PARSER ════════
-    export const parserRules    : parser.Rules = [...[
+    export const parserRules    : parser.Types.Rules = [...[
 
-        parser.createRule('Root',
-            parser.oneOrMore(parser.rule('Statement')),
-            { build: (matches:any) => matches }
-        ),
+        // parser.createRule('Root',
+        //     parser.oneOrMore(parser.rule('Statement')),
+        // ),
 
-    ], ...StatementRules as parser.Rules, ...ExpressionRules as parser.Rules];
+    ], ...ExpressionRules as parser.Types.Rules];
 
     // ════════ SETTINGS ════════
-    export const parserSettings : parser.ParserSettings = {
-        startRule           : 'Root',
+    export const parserSettings : parser.Types.ParserSettings = {
+        startRule           : 'Expression',
 
         errorRecovery       : {
-            mode            : 'strict',
-            maxErrors       : 1,
+            mode            : 'resilient',
+            maxErrors       : 0,
         },
 
         ignored             : ['ws', 'comment'],
         debug               : 'off',
-        maxDepth            : 1000,
+        maxDepth            : 100,
         maxCacheSize        : 1024, // 1GB
     };
 

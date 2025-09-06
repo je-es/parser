@@ -6,8 +6,9 @@
 
 // ╔════════════════════════════════════════ PACK ════════════════════════════════════════╗
 
-    import * as rules from './rules/rules';
-    import * as Program from './libs/program/program';
+    import * as rules from '../rules';
+    import { ParseResult } from '../../../lib/types';
+    import * as Program from '../../libs/program/program';
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
@@ -32,65 +33,65 @@
                 output      : Program.Expression.createPrimaryLiteralInteger({ start: 0, end: 2 }, 55),
             },
 
-            // // float (n.n)
-            // {
-            //     input       : '3.14',
-            //     output      : Program.Expression.createPrimaryLiteralFloat({ start: 0, end: 4 }, 3.14),
-            // },
+            // float (n.n)
+            {
+                input       : '3.14',
+                output      : Program.Expression.createPrimaryLiteralFloat({ start: 0, end: 4 }, 3.14),
+            },
 
-            // // float (using scientific notation)
-            // {
-            //     input       : '3.14e2',
-            //     output      : Program.Expression.createPrimaryLiteralFloat({ start: 0, end: 6 }, 3.14e2),
-            // },
+            // float (using scientific notation)
+            {
+                input       : '3.14e2',
+                output      : Program.Expression.createPrimaryLiteralFloat({ start: 0, end: 6 }, 3.14e2),
+            },
 
-            // // bool
-            // {
-            //     input       : 'true',
-            //     output      : Program.Expression.createPrimaryLiteralBool({ start: 0, end: 4 }, true),
-            // },
-            // {
-            //     input       : 'false',
-            //     output      : Program.Expression.createPrimaryLiteralBool({ start: 0, end: 5 }, false),
-            // },
+            // bool
+            {
+                input       : 'true',
+                output      : Program.Expression.createPrimaryLiteralBool({ start: 0, end: 4 }, true),
+            },
+            {
+                input       : 'false',
+                output      : Program.Expression.createPrimaryLiteralBool({ start: 0, end: 5 }, false),
+            },
 
-            // // null
-            // {
-            //     input       : 'null',
-            //     output      : Program.Expression.createPrimaryLiteralNull({ start: 0, end: 4 }),
-            // },
+            // null
+            {
+                input       : 'null',
+                output      : Program.Expression.createPrimaryLiteralNull({ start: 0, end: 4 }),
+            },
 
-            // // undefined
-            // {
-            //     input       : 'undefined',
-            //     output      : Program.Expression.createPrimaryLiteralUndefined({ start: 0, end: 9 }),
-            // },
+            // undefined
+            {
+                input       : 'undefined',
+                output      : Program.Expression.createPrimaryLiteralUndefined({ start: 0, end: 9 }),
+            },
 
-            // // string
-            // {
-            //     input       : `"hello"`,
-            //     output      : Program.Expression.createPrimaryLiteralString({ start: 0, end: 7 }, 'hello'),
-            // },
+            // string
+            {
+                input       : `"hello"`,
+                output      : Program.Expression.createPrimaryLiteralString({ start: 0, end: 7 }, 'hello'),
+            },
 
-            // // character
-            // {
-            //     input       : `'c'`,
-            //     output      : Program.Expression.createPrimaryLiteralCharacter({ start: 0, end: 3 }, 'c'),
-            // },
+            // character
+            {
+                input       : `'c'`,
+                output      : Program.Expression.createPrimaryLiteralCharacter({ start: 0, end: 3 }, 'c'),
+            },
 
             // array
-            // {
-            //     input       : `[]`,
-            //     output      : Program.Expression.createPrimaryLiteralArray({ start: 0, end: 2 }, []),
-            // },
-            // {
-            //     input       : `[1, 2, 3]`,
-            //     output      : Program.Expression.createPrimaryLiteralArray({ start: 0, end: 9 }, [
-            //         Program.Expression.createPrimaryLiteralInteger({ start: 1, end: 2 }, 1),
-            //         Program.Expression.createPrimaryLiteralInteger({ start: 4, end: 5 }, 2),
-            //         Program.Expression.createPrimaryLiteralInteger({ start: 7, end: 8 }, 3),
-            //     ]),
-            // },
+            {
+                input       : `[]`,
+                output      : Program.Expression.createPrimaryLiteralArray({ start: 0, end: 2 }, []),
+            },
+            {
+                input       : `[1, 2, 3]`,
+                output      : Program.Expression.createPrimaryLiteralArray({ start: 0, end: 9 }, [
+                    Program.Expression.createPrimaryLiteralInteger({ start: 1, end: 2 }, 1),
+                    Program.Expression.createPrimaryLiteralInteger({ start: 4, end: 5 }, 2),
+                    Program.Expression.createPrimaryLiteralInteger({ start: 7, end: 8 }, 3),
+                ]),
+            },
         ],
 
         // PrimaryIdentifier : [
@@ -1648,11 +1649,11 @@
             for (const { input, output } of tests) {
                 const success = !Array.isArray(output);
                 it(input, () => {
-                    const result = Expr.parse(input);
-                    console.log(JSON.stringify(result, null, 2));
+                    const result : ParseResult = Expr.parse(input);
+                    // console.log(JSON.stringify(result, null, 2));
 
                     if (success) {
-                        expect(result.ast[0]).toEqual(output);
+                        expect(result.ast[0].getCustomData()!).toEqual(output);
                     } else {
                         expect(result.errors.length).toEqual((output as unknown[]).length);
                         for (let i = 0; i < (output as unknown[]).length; i++) {

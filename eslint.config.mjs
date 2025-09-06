@@ -23,7 +23,7 @@ export default tseslint.config(
 			'@stylistic': stylistic
 		},
 		rules: {
-			'curly': 'warn',
+			'curly': 'off',
 			'@stylistic/semi': ['warn', 'always'],
 			'@typescript-eslint/no-empty-function': 'off',
 			'@typescript-eslint/naming-convention': [
@@ -39,7 +39,7 @@ export default tseslint.config(
 					'argsIgnorePattern': '^_'
 				}
 			],
-			'@typescript-eslint/no-inferrable-types': 'off'
+			'@typescript-eslint/no-inferrable-types': 'off',
 		}
 	}
 );

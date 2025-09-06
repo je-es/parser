@@ -1,5 +1,5 @@
 type ResultStatus = 'unset' | 'failed' | 'passed';
-type ResultMode = 'unset' | 'token' | 'optional' | 'choice' | 'repeat' | 'seq';
+type ResultMode = 'unset' | 'token' | 'optional' | 'choice' | 'repeat' | 'seq' | 'custom';
 interface TokenSource {
     source_kind: 'token-source';
     kind: string;
@@ -23,22 +23,30 @@ interface SequenceSource {
     source_kind: 'sequence-source';
     result: Result[];
 }
-type ResultSource = TokenSource | OptionalSource | ChoiceSource | RepeatSource | SequenceSource | null;
+interface CustomSource {
+    source_kind: 'custom-source';
+    tag: string;
+    data: unknown;
+}
+type ResultSource = TokenSource | OptionalSource | ChoiceSource | RepeatSource | SequenceSource | CustomSource | null;
 declare class Result {
+    span: Span;
     status: ResultStatus;
     source: ResultSource;
     mode: ResultMode;
     errors: ParseError[];
-    constructor(status?: ResultStatus, source?: ResultSource, mode?: ResultMode);
+    constructor(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Span);
     clone(): Result;
-    static create(status?: ResultStatus, source?: ResultSource, mode?: ResultMode): Result;
+    static create(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Span): Result;
     static createAsToken(status?: ResultStatus, source?: Token): Result;
     static createAsOptional(status?: ResultStatus, source?: Result): Result;
     static createAsChoice(status?: ResultStatus, source?: Result, index?: number): Result;
     static createAsRepeat(status?: ResultStatus, source?: Result[]): Result;
     static createAsSequence(status?: ResultStatus, source?: Result[]): Result;
+    static createAsCustom(status?: ResultStatus, name?: string, data?: unknown, span?: Span): Result;
     withError(err: ParseError): Result;
     isPassed(): boolean;
+    isFullyPassed(): boolean;
     isFailed(): boolean;
     isUnset(): boolean;
     isToken(): boolean;
@@ -47,6 +55,7 @@ declare class Result {
     isChoice(): boolean;
     isRepeat(): boolean;
     isSequence(): boolean;
+    isCustom(): boolean;
     getTokenKind(): string | undefined;
     getTokenValue(): string | null | undefined;
     getTokenSpan(): Span | undefined;
@@ -58,6 +67,7 @@ declare class Result {
     getRepeatResult(): Result[] | undefined;
     getSequenceCount(): number | undefined;
     getSequenceResult(): Result[] | undefined;
+    getCustomData(): unknown | undefined;
     hasErrors(): boolean;
 }
 
@@ -89,7 +99,6 @@ declare class Parser {
     private globalSuccessRules;
     private lastLeafRule;
     constructor(rules: Rule[], settings?: ParserSettings);
-    static hanldeErrorSpan(span: Span): Span;
     parse(tokens: Token[]): ParseResult;
     private parseWithRecovery;
     protected parsePattern(pattern: Pattern, parentRule?: Rule): Result;
@@ -117,6 +126,7 @@ declare class Parser {
     isNextToken(type: string, ignoredTokens?: string[]): boolean;
     isPrevToken(type: string, startIndex?: number, ignoredTokens?: string[]): boolean;
     isPrevRule(name: string): boolean;
+    static hanldeErrorSpan(span: Span): Span;
     private createError;
     private getCustomErrorOr;
     private getInnerMostRule;
@@ -141,12 +151,6 @@ declare class Parser {
     private memoize;
     private shouldUseMemoization;
     private isRecursiveContext;
-}
-
-type core_Parser = Parser;
-declare const core_Parser: typeof Parser;
-declare namespace core {
-  export { core_Parser as Parser };
 }
 
 interface Token {
@@ -296,6 +300,7 @@ declare function oneOrMore(pattern: Pattern, separator?: Pattern, silent?: boole
 declare function zeroOrMore(pattern: Pattern, separator?: Pattern, silent?: boolean): Pattern;
 declare function zeroOrOne(pattern: Pattern, separator?: Pattern, silent?: boolean): Pattern;
 declare function seq(...patterns: Pattern[]): Pattern;
+declare function rule(name: string, silent?: boolean): Pattern;
 declare function silent<T extends Pattern>(pattern: T): T;
 declare function loud<T extends Pattern>(pattern: T): T;
 declare function error(cond: ErrorHandler['cond'], msg: string, code?: string): ErrorHandler;
@@ -303,4 +308,4 @@ declare const errorRecoveryStrategies: {
     skipUntil(tokens: string | string[]): RecoveryStrategy;
 };
 
-export { Types, choice, core, createRule, error, errorRecoveryStrategies, loud, oneOrMore, optional, parse, repeat, seq, silent, token, zeroOrMore, zeroOrOne };
+export { Parser, Types, choice, createRule, error, errorRecoveryStrategies, loud, oneOrMore, optional, parse, repeat, rule, seq, silent, token, zeroOrMore, zeroOrOne };

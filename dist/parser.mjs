@@ -30,18 +30,13 @@ __export(types_exports, {
   Result: () => Result
 });
 
-// lib/core.ts
-var core_exports = {};
-__export(core_exports, {
-  Parser: () => Parser
-});
-
 // lib/result.ts
 var Result = class _Result {
   // Initialization
-  constructor(status, source, mode) {
+  constructor(status, source, mode, span) {
     // ┌──────────────────────────────── INIT ──────────────────────────────┐
     // Core data
+    this.span = { start: -1, end: -1 };
     this.status = "unset";
     this.source = null;
     this.mode = "unset";
@@ -49,6 +44,7 @@ var Result = class _Result {
     this.status = status != null ? status : "unset";
     this.source = source != null ? source : null;
     this.mode = mode != null ? mode : "unset";
+    this.span = span != null ? span : { start: -1, end: -1 };
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌──────────────────────────────── MAIN ──────────────────────────────┐
@@ -59,8 +55,8 @@ var Result = class _Result {
     res.errors = [...this.errors];
     return res;
   }
-  static create(status, source, mode) {
-    return new _Result(status, source, mode);
+  static create(status, source, mode, span) {
+    return new _Result(status, source, mode, span);
   }
   static createAsToken(status, source) {
     var _a, _b, _c;
@@ -70,14 +66,14 @@ var Result = class _Result {
       value: (_b = source == null ? void 0 : source.value) != null ? _b : void 0,
       span: (_c = source == null ? void 0 : source.span) != null ? _c : void 0
     };
-    return _Result.create(status, newSource, "token");
+    return _Result.create(status, newSource, "token", newSource.span);
   }
   static createAsOptional(status, source) {
     const newSource = {
       source_kind: "optional-source",
       result: source != null ? source : null
     };
-    return _Result.create(status, newSource, "optional");
+    return _Result.create(status, newSource, "optional", source == null ? void 0 : source.span);
   }
   static createAsChoice(status, source, index) {
     const newSource = {
@@ -85,21 +81,35 @@ var Result = class _Result {
       atIndex: index != null ? index : -1,
       result: source != null ? source : null
     };
-    return _Result.create(status, newSource, "choice");
+    return _Result.create(status, newSource, "choice", source == null ? void 0 : source.span);
   }
   static createAsRepeat(status, source) {
     const newSource = {
       source_kind: "repeat-source",
       result: source != null ? source : []
     };
-    return _Result.create(status, newSource, "repeat");
+    const full_span = { start: -1, end: -1 };
+    full_span.start = source && source.length ? source[0].span.start : -1;
+    full_span.end = source && source.length ? source[source.length - 1].span.end : -1;
+    return _Result.create(status, newSource, "repeat", full_span);
   }
   static createAsSequence(status, source) {
     const newSource = {
       source_kind: "sequence-source",
       result: source != null ? source : []
     };
-    return _Result.create(status, newSource, "seq");
+    const full_span = { start: -1, end: -1 };
+    full_span.start = source && source.length ? source[0].span.start : -1;
+    full_span.end = source && source.length ? source[source.length - 1].span.end : -1;
+    return _Result.create(status, newSource, "seq", full_span);
+  }
+  static createAsCustom(status, name, data, span) {
+    const newSource = {
+      source_kind: "custom-source",
+      tag: name != null ? name : "",
+      data: data != null ? data : null
+    };
+    return _Result.create(status, newSource, "custom", span);
   }
   withError(err) {
     this.errors.push(err);
@@ -109,6 +119,11 @@ var Result = class _Result {
   // ┌──────────────────────────────── IS_X ──────────────────────────────┐
   isPassed() {
     return this.status === "passed";
+  }
+  isFullyPassed() {
+    if (!this.isPassed()) return false;
+    if (this.isOptional() && !this.isOptionalMatched()) return false;
+    return true;
   }
   isFailed() {
     return this.status === "failed";
@@ -133,6 +148,9 @@ var Result = class _Result {
   }
   isSequence() {
     return this.mode === "seq";
+  }
+  isCustom() {
+    return this.mode === "custom";
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌────────────────────────────── GETTERS ─────────────────────────────┐
@@ -209,6 +227,12 @@ var Result = class _Result {
     }
     return void 0;
   }
+  getCustomData() {
+    if (this.isCustom()) {
+      return this.source.data;
+    }
+    return void 0;
+  }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌──────────────────────────────── HELP ──────────────────────────────┐
   hasErrors() {
@@ -246,7 +270,7 @@ var Parser = class _Parser {
     this.successfulRules = [];
     this.globalSuccessRules = [];
     this.lastLeafRule = "unknown";
-    this.rules = new Map(rules.map((rule) => [rule.name, rule]));
+    this.rules = new Map(rules.map((rule2) => [rule2.name, rule2]));
     this.settings = this.normalizeSettings(settings);
     this.debugLevel = this.settings.debug;
     this.ignoredSet = new Set(this.settings.ignored);
@@ -258,12 +282,6 @@ var Parser = class _Parser {
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌──────────────────────────────── MAIN ──────────────────────────────┐
-  static hanldeErrorSpan(span) {
-    if (span.start === span.end) {
-      span.end += 1;
-    }
-    return span;
-  }
   parse(tokens) {
     this.resetState(tokens);
     this.startTime = Date.now();
@@ -465,7 +483,7 @@ var Parser = class _Parser {
     try {
       this.stats.rulesApplied++;
       const result = this.parsePattern(targetRule.pattern, targetRule);
-      if (result.isFailed()) {
+      if (!result.isFullyPassed()) {
         this.successfulRules = savedSuccessfulRules;
         if (shouldBeSilent) {
           this.log("rules", `\u2717 ${ruleName} (silent) @${this.lastVisitedIndex}`);
@@ -528,7 +546,7 @@ var Parser = class _Parser {
     const savedErrors = [...this.errors];
     try {
       const result = this.parsePattern(pattern, parentRule);
-      if (result.isPassed()) {
+      if (result.isFullyPassed()) {
         this.log("verbose", `\u2713 OPTIONAL \u2192 [1 element] @${this.index}`);
         return Result.createAsOptional("passed", result);
       } else {
@@ -555,7 +573,7 @@ var Parser = class _Parser {
       this.errors = [...savedErrors];
       try {
         const result = this.parsePattern(patterns[patternIndex], parentRule);
-        if (result.isPassed()) {
+        if (result.isFullyPassed()) {
           this.log("verbose", `\u2713 CHOICE \u2192 alt ${patternIndex + 1}/${patterns.length} succeeded @${this.lastVisitedIndex}`);
           return Result.createAsChoice("passed", result, patternIndex);
         }
@@ -628,7 +646,7 @@ var Parser = class _Parser {
       const savedErrors = [...this.errors];
       try {
         const result = this.parsePattern(pattern, parentRule);
-        if (result === null) {
+        if (!result.isFullyPassed()) {
           this.errors = savedErrors;
           if (results.length >= min) {
             break;
@@ -661,7 +679,7 @@ var Parser = class _Parser {
           const sepSavedErrors = [...this.errors];
           try {
             const sepResult = this.parsePattern(separator, void 0);
-            if (sepResult === null) {
+            if (!sepResult.isFullyPassed()) {
               this.index = sepStart;
               this.errors = sepSavedErrors;
               break;
@@ -721,7 +739,7 @@ var Parser = class _Parser {
         const pattern = patterns[lastPatternIndex];
         const beforePatternIndex = this.index;
         const result = this.parsePattern(pattern, parentRule);
-        if (result === null) {
+        if (!result.isFullyPassed()) {
           if (shouldBeSilent) {
             this.index = startIndex;
             this.errors = savedErrors;
@@ -780,9 +798,9 @@ var Parser = class _Parser {
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌──────────────────────────────── MODE ──────────────────────────────┐
-  shouldBeSilent(pattern, rule) {
+  shouldBeSilent(pattern, rule2) {
     var _a;
-    return ((_a = rule == null ? void 0 : rule.options) == null ? void 0 : _a.silent) === true || pattern.silent === true || this.silentContextStack.length > 0 && this.silentContextStack[this.silentContextStack.length - 1];
+    return ((_a = rule2 == null ? void 0 : rule2.options) == null ? void 0 : _a.silent) === true || pattern.silent === true || this.silentContextStack.length > 0 && this.silentContextStack[this.silentContextStack.length - 1];
   }
   isInSilentMode() {
     return this.silentContextStack.length > 0 && this.silentContextStack[this.silentContextStack.length - 1];
@@ -814,8 +832,8 @@ var Parser = class _Parser {
   validateGrammar() {
     const issues = [];
     const ruleNames = new Set(Array.from(this.rules.keys()));
-    for (const [ruleName, rule] of this.rules) {
-      const referencedRules = this.extractRuleReferences(rule.pattern);
+    for (const [ruleName, rule2] of this.rules) {
+      const referencedRules = this.extractRuleReferences(rule2.pattern);
       for (const ref of referencedRules) {
         if (!ruleNames.has(ref)) {
           issues.push(`Rule '${ruleName}' references undefined rule '${ref}'`);
@@ -1005,6 +1023,12 @@ var Parser = class _Parser {
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌─────────────────────────────── ERROR ──────────────────────────────┐
+  static hanldeErrorSpan(span) {
+    if (span.start === span.end) {
+      span.end += 1;
+    }
+    return span;
+  }
   createError(code, msg, span, failedAt, tokenIndex, prevRule, prevInnerRule) {
     return {
       code,
@@ -1016,12 +1040,12 @@ var Parser = class _Parser {
       prevInnerRule: prevInnerRule || this.getInnerMostRule()
     };
   }
-  getCustomErrorOr(rule, defaultError) {
+  getCustomErrorOr(rule2, defaultError) {
     var _a;
-    if (!((_a = rule == null ? void 0 : rule.options) == null ? void 0 : _a.errors)) {
+    if (!((_a = rule2 == null ? void 0 : rule2.options) == null ? void 0 : _a.errors)) {
       return defaultError;
     }
-    for (const errorHandler of rule.options.errors) {
+    for (const errorHandler of rule2.options.errors) {
       let matches = false;
       if (typeof errorHandler.cond === "number") {
         matches = defaultError.failedAt === errorHandler.cond;
@@ -1068,9 +1092,9 @@ var Parser = class _Parser {
     }
     const meaningfulRules = [...this.successfulRules, ...this.globalSuccessRules];
     for (let i = meaningfulRules.length - 1; i >= 0; i--) {
-      const rule = meaningfulRules[i];
-      if (this.isMeaningfulRule(rule)) {
-        return rule;
+      const rule2 = meaningfulRules[i];
+      if (this.isMeaningfulRule(rule2)) {
+        return rule2;
       }
     }
     if (this.lastCompletedRule !== "unknown" && this.lastCompletedRule.length < 30) {
@@ -1078,8 +1102,8 @@ var Parser = class _Parser {
     }
     return this.lastInnerRule;
   }
-  isMeaningfulRule(rule) {
-    return rule !== "unknown" && !rule.includes("<") && !rule.includes("\u2192") && rule.length < 30;
+  isMeaningfulRule(rule2) {
+    return rule2 !== "unknown" && !rule2.includes("<") && !rule2.includes("\u2192") && rule2.length < 30;
   }
   addError(error2) {
     if (this.isInSilentMode()) {
@@ -1095,8 +1119,8 @@ var Parser = class _Parser {
     this.errors.push(error2);
     this.log("errors", `\u26A0\uFE0F  ${error2.msg} @${error2.span.start}:${error2.span.end}`);
   }
-  handleParseError(error2, rule) {
-    const finalError = this.getCustomErrorOr(rule, error2);
+  handleParseError(error2, rule2) {
+    const finalError = this.getCustomErrorOr(rule2, error2);
     throw finalError;
   }
   handleFatalError(error2) {
@@ -1145,9 +1169,9 @@ var Parser = class _Parser {
       this.getInnerMostRule()
     );
   }
-  applyRecovery(rule, startIndex) {
+  applyRecovery(rule2, startIndex) {
     var _a;
-    const recovery = (_a = rule == null ? void 0 : rule.options) == null ? void 0 : _a.recovery;
+    const recovery = (_a = rule2 == null ? void 0 : rule2.options) == null ? void 0 : _a.recovery;
     if (recovery) {
       this.applyRecoveryStrategy(recovery);
     } else {
@@ -1161,12 +1185,12 @@ var Parser = class _Parser {
       this.index++;
     }
   }
-  getCustomErrorForCondition(rule, failedAt, tokenIndex, _startIndex) {
+  getCustomErrorForCondition(rule2, failedAt, tokenIndex, _startIndex) {
     var _a;
-    if (!((_a = rule == null ? void 0 : rule.options) == null ? void 0 : _a.errors)) {
+    if (!((_a = rule2 == null ? void 0 : rule2.options) == null ? void 0 : _a.errors)) {
       return null;
     }
-    for (const errorHandler of rule.options.errors) {
+    for (const errorHandler of rule2.options.errors) {
       let matches = false;
       if (typeof errorHandler.cond === "number") {
         matches = failedAt === errorHandler.cond;
@@ -1175,7 +1199,7 @@ var Parser = class _Parser {
           const opt = {
             failedAt,
             tokenIndex,
-            prevRule: rule.name,
+            prevRule: rule2.name,
             prevInnerRule: this.getInnerMostRule(true)
           };
           matches = errorHandler.cond(this, opt);
@@ -1191,7 +1215,7 @@ var Parser = class _Parser {
           this.getCurrentSpan(),
           failedAt,
           tokenIndex,
-          rule.name,
+          rule2.name,
           this.getInnerMostRule(true)
         );
       }
@@ -1274,8 +1298,8 @@ var Parser = class _Parser {
     const errorContext = this.errors.length > 0 ? `E${this.errors.length}` : "E0";
     const baseKey = `${pattern.type}:${position}:${silentContext}:${errorContext}`;
     if (ruleName) {
-      const rule = this.rules.get(ruleName);
-      const ruleContext = this.getRuleContext(rule);
+      const rule2 = this.rules.get(ruleName);
+      const ruleContext = this.getRuleContext(rule2);
       return `rule:${ruleName}:${ruleContext}:${baseKey}`;
     }
     switch (pattern.type) {
@@ -1294,15 +1318,15 @@ var Parser = class _Parser {
         return baseKey;
     }
   }
-  getRuleContext(rule) {
+  getRuleContext(rule2) {
     var _a, _b, _c, _d, _e;
-    if (!rule) {
+    if (!rule2) {
       return "none";
     }
-    const hasBuilder = ((_a = rule.options) == null ? void 0 : _a.build) ? "B" : "";
-    const hasErrors = ((_c = (_b = rule.options) == null ? void 0 : _b.errors) == null ? void 0 : _c.length) ? "E" : "";
-    const hasRecovery = ((_d = rule.options) == null ? void 0 : _d.recovery) ? "R" : "";
-    const isSilent = ((_e = rule.options) == null ? void 0 : _e.silent) ? "S" : "";
+    const hasBuilder = ((_a = rule2.options) == null ? void 0 : _a.build) ? "B" : "";
+    const hasErrors = ((_c = (_b = rule2.options) == null ? void 0 : _b.errors) == null ? void 0 : _c.length) ? "E" : "";
+    const hasRecovery = ((_d = rule2.options) == null ? void 0 : _d.recovery) ? "R" : "";
+    const isSilent = ((_e = rule2.options) == null ? void 0 : _e.silent) ? "S" : "";
     return `${hasBuilder}${hasErrors}${hasRecovery}${isSilent}`;
   }
   hashPatterns(patterns) {
@@ -1339,7 +1363,7 @@ var Parser = class _Parser {
     if (!this.settings.maxCacheSize || this.memoCache.size >= this.settings.maxCacheSize) {
       return;
     }
-    if (result === null && startIndex === endIndex) {
+    if (!result.isFullyPassed() && startIndex === endIndex) {
       this.log("verbose", `\u26A0\uFE0F Skip memo (no progress): ${key}`);
       return;
     }
@@ -1453,6 +1477,12 @@ function seq(...patterns) {
   }
   return { type: "seq", patterns, silent: false };
 }
+function rule(name, silent2 = false) {
+  if (!name || typeof name !== "string") {
+    throw new Error("Rule name must be a non-empty string");
+  }
+  return { type: "rule", name, silent: silent2 };
+}
 function silent(pattern) {
   return __spreadProps(__spreadValues({}, pattern), { silent: true });
 }
@@ -1468,9 +1498,9 @@ var errorRecoveryStrategies = {
   }
 };
 export {
+  Parser,
   types_exports as Types,
   choice,
-  core_exports as core,
   createRule,
   error,
   errorRecoveryStrategies,
@@ -1479,6 +1509,7 @@ export {
   optional,
   parse,
   repeat,
+  rule,
   seq,
   silent,
   token,

@@ -8,8 +8,10 @@
 
     import { Span, NodeVisitor, Node } from './base';
     import { Field } from './Field';
+    import { Statement } from './Statement';
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
+
 
 
 // ╔════════════════════════════════════════ META ════════════════════════════════════════╗
@@ -20,7 +22,7 @@
         | 'Undefined';
 
     export type PrimaryTypes =
-        | 'Literal'     | 'Identifier'  | 'Paren'       | 'Object';
+        | 'Literal'     | 'Identifier'  | 'Paren';
 
     export type PostfixTypes =
         | 'Increment'   | 'Decrement'   | 'Dereference' | 'MemberAccess'
@@ -32,7 +34,7 @@
 
     export type BaseExpressionCtrl =
         | 'Unset'       | 'Primary'    | 'Postfix'      | 'Prefix'
-        | 'Binary';
+        | 'Binary'      | 'Object'     | 'Compute';
 
     export type BinaryExpressionKind =
         | 'Power'       | 'Additive'    | 'Shift'       | 'Multiplicative'
@@ -43,6 +45,7 @@
     export type ExpressionKind = BaseExpressionCtrl | BinaryExpressionKind;
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
+
 
 
 // ╔════════════════════════════════════════ TYPE ════════════════════════════════════════╗
@@ -66,6 +69,12 @@
         fields          : Field[];
     }
 
+    // ═══════ Compute ═══════
+    export interface ComputeSource {
+        kind            : 'Compute';
+        statements      : Statement[];
+    }
+
     // ═══════ Literal ═══════
     export type LiteralValueTypes = number | string | boolean | null | undefined | Expression[];
     export interface LiteralSource {
@@ -76,7 +85,7 @@
     // ═══════ Primary ═══════
     export interface PrimarySource {
         kind             : PrimaryTypes;
-        source           : LiteralSource | IdentSource | ParenSource | ObjectSource;
+        source           : LiteralSource | IdentSource | ParenSource;
     }
 
     // ═══════ Postfix ═══════
@@ -108,7 +117,7 @@
         source          ?: ExpressionSource;
     }
 
-    export type ExpressionSource = PrimarySource | PostfixSource | PrefixSource | BinarySource;
+    export type ExpressionSource = PrimarySource | PostfixSource | PrefixSource | BinarySource | ObjectSource | ComputeSource;
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
@@ -118,11 +127,11 @@
 
     export class Expression extends Node {
             isBinaryBitwiseAnd(): boolean {
-                return this.isBinary() && this.source.kind === 'BitwiseAnd';
+                return this.getBinaryKind() === 'BitwiseAnd';
             }
 
             isBinaryBitwiseOr(): boolean {
-                return this.isBinary() && this.source.kind === 'BitwiseOr';
+                return this.getBinaryKind() === 'BitwiseOr';
             }
 
         // ┌──────────────────────────────── INIT ──────────────────────────────┐
@@ -169,9 +178,6 @@
                             children.push(...(literalSource.value as Expression[]));
                         }
                     }
-                    else if (primSource.kind === 'Object') {
-                        children.push(...((primSource.source as ObjectSource).fields));
-                    }
                 }
 
                 else if (this.isPostfix()) {
@@ -193,6 +199,16 @@
                     if (binSource.condition) {children.push(binSource.condition);}
                 }
 
+                else if (this.isObject()) {
+                    const objSource = this.source as ObjectSource;
+                    children.push(...objSource.fields);
+                }
+
+                else if (this.isCompute()) {
+                    const cmpSource = this.source as ComputeSource;
+                    children.push(...cmpSource.statements);
+                }
+
                 return children;
             }
 
@@ -205,6 +221,13 @@
 
 
         // ┌──────────────────────────────── HELP ──────────────────────────────┐
+
+            getPrimaryKind(): PrimaryTypes | undefined {
+                if (this.isPrimary()) {
+                    return (this.source as PrimarySource).kind;
+                }
+                return undefined;
+            }
 
             getPrimarySource(): PrimarySource | undefined {
                 if (this.isPrimary()) {
@@ -253,13 +276,6 @@
                 return undefined;
             }
 
-            getPrimaryObjectFields(): Field[] | undefined {
-                if (this.isPrimaryObject()) {
-                    return ((this.source as PrimarySource).source as ObjectSource).fields;
-                }
-                return undefined;
-            }
-
             getPrimaryLiteralArraySize(): number | undefined {
                 if (this.isPrimaryLiteralArray()) {
                     return (((this.source as PrimarySource).source as LiteralSource).value as Expression[]).length;
@@ -291,6 +307,13 @@
             getPrimaryIdentifierIsBuiltin(): boolean | undefined {
                 if (this.isPrimaryIdentifier()) {
                     return ((this.source as PrimarySource).source as IdentSource).builtin;
+                }
+                return undefined;
+            }
+
+            getPostfixKind(): PostfixTypes | undefined {
+                if (this.isPostfix()) {
+                    return (this.source as PostfixSource).kind;
                 }
                 return undefined;
             }
@@ -365,6 +388,13 @@
                 return undefined;
             }
 
+            getPrefixKind(): PrefixTypes | undefined {
+                if (this.isPrefix()) {
+                    return (this.source as PrefixSource).kind;
+                }
+                return undefined;
+            }
+
             getPrefixSource(): PrefixSource | undefined {
                 if (this.isPrefix()) {
                     return this.source as PrefixSource;
@@ -375,6 +405,13 @@
             getPrefixExpression(): Expression | undefined {
                 if (this.isPrefix()) {
                     return (this.source as PrefixSource).source;
+                }
+                return undefined;
+            }
+
+            getBinaryKind(): BinaryExpressionKind | undefined {
+                if (this.isBinary()) {
+                    return (this.source as BinarySource).kind;
                 }
                 return undefined;
             }
@@ -449,6 +486,20 @@
                 return undefined;
             }
 
+            getObjectFields(): Field[] | undefined {
+                if (this.isObject()) {
+                    return (this.source as ObjectSource).fields;
+                }
+                return undefined;
+            }
+
+            getComputeStatments(): Statement[] | undefined {
+                if (this.isCompute()) {
+                    return (this.source as ComputeSource).statements;
+                }
+                return undefined;
+            }
+
         // └────────────────────────────────────────────────────────────────────┘
 
 
@@ -467,37 +518,35 @@
             }
 
             isPrimaryLiteralArray(): boolean {
-                return this.isPrimaryLiteral() && ((this.source as PrimarySource).source as LiteralSource).kind === 'Array';
+                return this.getPrimaryLiteralKind() === 'Array';
             }
 
             isPrimaryLiteralInteger(): boolean {
-                return this.isPrimaryLiteral() && ((this.source as PrimarySource).source as LiteralSource).kind === 'Integer';
+                return this.getPrimaryLiteralKind() === 'Integer';
             }
 
             isPrimaryLiteralFloat(): boolean {
-                return this.isPrimaryLiteral() && ((this.source as PrimarySource).source as LiteralSource).kind === 'Float';
+                return this.getPrimaryLiteralKind() === 'Float';
             }
 
             isPrimaryLiteralBoolean(): boolean {
-                const primarySource = this.getPrimarySource();
-                return primarySource?.kind === 'Literal' &&
-                    (primarySource.source as LiteralSource)?.kind === 'Bool';
+                return this.getPrimaryLiteralKind() === 'Bool';
             }
 
             isPrimaryLiteralCharacter(): boolean {
-                return this.isPrimaryLiteral() && ((this.source as PrimarySource).source as LiteralSource).kind === 'Char';
+                return this.getPrimaryLiteralKind() === 'Char';
             }
 
             isPrimaryLiteralString(): boolean {
-                return this.isPrimaryLiteral() && ((this.source as PrimarySource).source as LiteralSource).kind === 'String';
+                return this.getPrimaryLiteralKind() === 'String';
             }
 
             isPrimaryLiteralNull(): boolean {
-                return this.isPrimaryLiteral() && ((this.source as PrimarySource).source as LiteralSource).kind === 'Null';
+                return this.getPrimaryLiteralKind() === 'Null';
             }
 
             isPrimaryLiteralUndefined(): boolean {
-                return this.isPrimaryLiteral() && ((this.source as PrimarySource).source as LiteralSource).kind === 'Undefined';
+                return this.getPrimaryLiteralKind() === 'Undefined';
             }
 
             isPrimaryIdentifier(): boolean {
@@ -506,10 +555,6 @@
 
             isPrimaryParen(): boolean {
                 return this.isPrimary() && this.source.kind === 'Paren';
-            }
-
-            isPrimaryObject(): boolean {
-                return this.isPrimary() && this.source.kind === 'Object';
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -522,27 +567,27 @@
             }
 
             isPostfixIncrement(): boolean {
-                return this.isPostfix() && this.source.kind === 'Increment';
+                return this.getPostfixKind() === 'Increment';
             }
 
             isPostfixDecrement(): boolean {
-                return this.isPostfix() && this.source.kind === 'Decrement';
+                return this.getPostfixKind() === 'Decrement';
             }
 
             isPostfixDereference(): boolean {
-                return this.isPostfix() && this.source.kind === 'Dereference';
+                return this.getPostfixKind() === 'Dereference';
             }
 
             isPostfixMemberAccess(): boolean {
-                return this.isPostfix() && this.source.kind === 'MemberAccess';
+                return this.getPostfixKind() === 'MemberAccess';
             }
 
             isPostfixCall(): boolean {
-                return this.isPostfix() && this.source.kind === 'Call';
+                return this.getPostfixKind() === 'Call';
             }
 
             isPostfixArrayAccess(): boolean {
-                return this.isPostfix() && this.source.kind === 'ArrayAccess';
+                return this.getPostfixKind() === 'ArrayAccess';
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -555,31 +600,31 @@
             }
 
             isPrefixIncrement(): boolean {
-                return this.isPrefix() && this.source.kind === 'Increment';
+                return this.getPrefixKind() === 'Increment';
             }
 
             isPrefixDecrement(): boolean {
-                return this.isPrefix() && this.source.kind === 'Decrement';
+                return this.getPrefixKind() === 'Decrement';
             }
 
             isPrefixReference(): boolean {
-                return this.isPrefix() && this.source.kind === 'Reference';
+                return this.getPrefixKind() === 'Reference';
             }
 
             isPrefixUnaryMinus(): boolean {
-                return this.isPrefix() && this.source.kind === 'UnaryMinus';
+                return this.getPrefixKind() === 'UnaryMinus';
             }
 
             isPrefixUnaryPlus(): boolean {
-                return this.isPrefix() && this.source.kind === 'UnaryPlus';
+                return this.getPrefixKind() === 'UnaryPlus';
             }
 
             isPrefixLogicalNot(): boolean {
-                return this.isPrefix() && this.source.kind === 'LogicalNot';
+                return this.getPrefixKind() === 'LogicalNot';
             }
 
             isPrefixBitwiseNot(): boolean {
-                return this.isPrefix() && this.source.kind === 'BitwiseNot';
+                return this.getPrefixKind() === 'BitwiseNot';
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -592,51 +637,65 @@
             }
 
             isBinaryPower(): boolean {
-                return this.isBinary() && this.source.kind === 'Power';
+                return this.getBinaryKind() === 'Power';
             }
 
             isBinaryMultiplicative(): boolean {
-                return this.isBinary() && this.source.kind === 'Multiplicative';
+                return this.getBinaryKind() === 'Multiplicative';
             }
 
             isBinaryAdditive(): boolean {
-                return this.isBinary() && this.source.kind === 'Additive';
+                return this.getBinaryKind() === 'Additive';
             }
 
             isBinaryShift(): boolean {
-                return this.isBinary() && this.source.kind === 'Shift';
+                return this.getBinaryKind() === 'Shift';
             }
 
             isBinaryBitwiseXor(): boolean {
-                return this.isBinary() && this.source.kind === 'BitwiseXor';
+                return this.getBinaryKind() === 'BitwiseXor';
             }
 
             isBinaryLogicalNot(): boolean {
-                return this.isBinary() && this.source.kind === 'LogicalNot';
+                // special case
+                return (this.getBinaryKind() as PrefixTypes) === 'LogicalNot';
             }
 
             isBinaryLogicalAnd(): boolean {
-                return this.isBinary() && this.source.kind === 'LogicalAnd';
+                return this.getBinaryKind() === 'LogicalAnd';
             }
 
             isBinaryLogicalOr(): boolean {
-                return this.isBinary() && this.source.kind === 'LogicalOr';
+                return this.getBinaryKind() === 'LogicalOr';
             }
 
             isBinaryRelational(): boolean {
-                return this.isBinary() && this.source.kind === 'Relational';
+                return this.getBinaryKind() === 'Relational';
             }
 
             isBinaryEquality(): boolean {
-                return this.isBinary() && this.source.kind === 'Equality';
+                return this.getBinaryKind() === 'Equality';
             }
 
             isBinaryTernary(): boolean {
-                return this.isBinary() && this.source.kind === 'Ternary';
+                return this.getBinaryKind() === 'Ternary';
             }
 
             isBinaryAssignment(): boolean {
-                return this.isBinary() && this.source.kind === 'Assignment';
+                return this.getBinaryKind() === 'Assignment';
+            }
+
+        // └────────────────────────────────────────────────────────────────────┘
+
+
+        // ┌──────────────────────────── Is_Container ──────────────────────────┐
+
+            isObject(): boolean {
+                return this.kind === 'Object';
+            }
+
+            isCompute(): boolean {
+                return this.kind === 'Compute';
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -690,10 +749,6 @@
 
             static createPrimaryParen(span: Span, expression: Expression): Expression {
                 return this.createPrimary(span, { kind: 'Paren', source: { kind: 'Paren', source: expression } });
-            }
-
-            static createPrimaryObject(span: Span, fields: Field[]): Expression {
-                return this.createPrimary(span, { kind: 'Object', source: { kind: 'Object', fields } });
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -825,6 +880,19 @@
 
             static createBinaryAssignment(span: Span, left: Expression, operator: string, right: Expression): Expression {
                 return this.createBinary(span, { kind: 'Assignment', left, right, operator });
+            }
+
+        // └────────────────────────────────────────────────────────────────────┘
+
+
+        // ┌───────────────────────── Factory : Containers ─────────────────────┐
+
+            static createObject(span: Span, fields: Field[]): Expression {
+                return new Expression(span, { kind: 'Object', source: { kind: 'Object', fields } });
+            }
+
+            static createCompute(span: Span, statements: Statement[]): Expression {
+                return new Expression(span, { kind: 'Compute', source: { kind: 'Compute', statements } });
             }
 
         // └────────────────────────────────────────────────────────────────────┘

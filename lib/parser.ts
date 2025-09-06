@@ -14,7 +14,7 @@
     export * as Types from './types';
 
     import * as core from './core';
-    export * as core from './core';
+    export { Parser } from './core';
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
@@ -91,6 +91,13 @@
                 throw new Error('Sequence must have at least one pattern');
             }
             return { type: 'seq', patterns, silent: false };
+        }
+
+        export function rule(name: string, silent = false): Types.Pattern {
+            if (!name || typeof name !== 'string') {
+                throw new Error('Rule name must be a non-empty string');
+            }
+            return { type: 'rule', name, silent };
         }
 
         export function silent<T extends Types.Pattern>(pattern: T): T {
