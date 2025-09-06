@@ -37,14 +37,14 @@ npm install @je-es/parser
 ```
 
 ```typescript
-import * as parser from '@je-es/parser';
+import * as parser from "@je-es/parser";
 ```
 
 ## 🌟 How to Use
 
 > This section is a continuation of the **How to Use** section of the [`@je-es/lexer`](https://github.com/je-es/lexer) repository.
 >
-> So, please read that first and let's continue converting our tokens into an **Abstract Syntax Tree (AST)**.
+> So, please read that first and let"s continue converting our tokens into an **Abstract Syntax Tree (AST)**.
 
 1. ### Create Parser Rules
 
@@ -53,17 +53,17 @@ import * as parser from '@je-es/parser';
         // Root rule - entry point
         parser.createRule('root',
             // `(..), (..), ..`
-            parser.oneOrMore(           // Shortcut for parser.repeat(..)
+            parser.oneOrMore(
                 parser.rule('group'),
-                parser.token('comma')   // Separated by commas
+                parser.token('comma')  // Separated by commas
             ),
             {
                 build: (matches) => ({
+                    span: parser.getMatchesSpan(matches),
                     rule: 'root',
-                    groups: matches.map(m => m.meta)
+                    value: matches.map(m => m.value)
                 }),
 
-                // Optional custom error recovery
                 recovery: parser.errorRecoveryStrategies.skipUntil(['open']),
                 silent: false
             }
@@ -74,19 +74,20 @@ import * as parser from '@je-es/parser';
             // (N +/- N)
             parser.seq(
                 parser.token('open'),       // (
-                parser.token('num'),        // N    => left
+                parser.token('num'),        // N    => left (FIXED: was 'number', now 'num')
 
                 parser.choice(              // +/-  => operator
                     parser.token('plus'), parser.token('minus')
                 ),
 
-                parser.token('num'),        // N    => right
+                parser.token('num'),        // N    => right (FIXED: was 'number', now 'num')
                 parser.token('close')       // )
             ),
             {
                 build: (matches) => ({
+                    span: parser.getMatchesSpan(matches),
                     rule: 'group',
-                    meta: {
+                    value: {
                         left        : matches[1].value,
                         operator    : matches[2].value,
                         right       : matches[3].value
@@ -94,25 +95,24 @@ import * as parser from '@je-es/parser';
                 }),
 
                 errors: [
-                    parser.error(0, "Expected opening parenthesis '('", "GROUP_ERROR_MISSING_OPEN"),
-                    parser.error(1, "Expected left operand", "GROUP_ERROR_MISSING_LEFT"),
-                    parser.error(2, "Expected operator", "GROUP_ERROR_MISSING_OPERATOR"),
-                    parser.error(3, "Expected right operand", "GROUP_ERROR_MISSING_RIGHT"),
-                    parser.error(4, "Expected closing parenthesis ')'", "GROUP_ERROR_MISSING_CLOSE"),
+                    parser.error(0, "Expected opening parenthesis '('",     "GROUP_ERROR_MISSING_OPEN"),
+                    parser.error(1, "Expected left operand",                "GROUP_ERROR_MISSING_LEFT"),
+                    parser.error(2, "Expected operator",                    "GROUP_ERROR_MISSING_OPERATOR"),
+                    parser.error(3, "Expected right operand",               "GROUP_ERROR_MISSING_RIGHT"),
+                    parser.error(4, "Expected closing parenthesis ')'",     "GROUP_ERROR_MISSING_CLOSE"),
                 ],
 
                 silent: false,
+                recovery: parser.errorRecoveryStrategies.skipUntil('open')
 
                 // Example: `(+2... (3+4)`
                 // An error occurs after the first `(` due to a missing left operand.
-                // If error recovery mode is set to `resilient`,
+                // If error recovery mode is not set to `resilient`,
                 // the parser will skip over "+2... " and resume parsing from the second `(`.
                 // All errors encountered will be recorded in `parser.errors`.
                 //
-                // Note: In `strict` mode, the parser halts at the first error,
+                // Note: In `resilient` mode, the parser halts at the first `(`,
                 // capturing a single error before returning.
-                recovery: parser.errorRecoveryStrategies.skipUntil('open'),
-                ...
             }
         ),
     ];
@@ -123,16 +123,16 @@ import * as parser from '@je-es/parser';
     ```typescript
     const parserSettings: parser.ParserSettings = {
         // Entry rule - where parsing begins
-        startRule               : 'root',
+        startRule               : "root",
 
         // Error recovery mode
         errorRecovery           : {
-            mode                : 'resilient',      // 'strict' | 'resilient'
+            mode                : "resilient",      // "strict" | "resilient"
             maxErrors           : 0,                // Stop after N errors (0 = unlimited)
         },
 
-        ignored                 : ['ws'],           // Ignore whitespace tokens
-        debug                   : 'off',            // Debug level: 'off' | 'errors' | 'rules' | 'patterns' | 'tokens' | 'verbose'
+        ignored                 : ["ws"],           // Ignore whitespace tokens
+        debug                   : "off",            // Debug level: "off" | "errors" | "rules" | "patterns" | "tokens" | "verbose"
         maxDepth                : 1000,             // Maximum recursion depth
         maxCacheSize            : 1000,             // Maximum cache size (in megabytes)
     };
@@ -143,7 +143,7 @@ import * as parser from '@je-es/parser';
     - #### Parse Valid Input
 
         ```typescript
-        const res = parser.parse(tokens_of_'(1+2)', rules, parserSettings);
+        const res = parser.parse(tokens_of_"(1+2)", rules, parserSettings);
         console.log(res);
         ```
 
@@ -153,8 +153,13 @@ import * as parser from '@je-es/parser';
             "ast": [
                 {
                     "rule": "root",
-                    "groups": [
-                        { "left": "1", "operator": "+", "right": "2" }
+                    "span": { "start": 0, "end": 5 },
+                    "value": [
+                        {
+                            "left": { "kind": "num", "value": "1" },
+                            "operator": { "kind": "plus", "value": "+" },
+                            "right": { "kind": "num", "value": "2" }
+                        },
                     ]
                 }
             ],
@@ -165,7 +170,7 @@ import * as parser from '@je-es/parser';
     - #### Parse Multiple Groups
 
         ```typescript
-        const res = parser.parse(tokens_of_'(1+2), (3-4), (5+6)', rules, parserSettings);
+        const res = parser.parse(tokens_of_"(1+2), (3-4), (5+6)", rules, parserSettings);
         console.log(res.ast[0].groups);
         ```
 
@@ -174,11 +179,12 @@ import * as parser from '@je-es/parser';
         {
             "ast": [
                 {
-                    "rule": "root",
-                    "groups": [
-                        { "left": "1", "operator": "+", "right": "2" },
-                        { "left": "3", "operator": "-", "right": "4" },
-                        { "left": "5", "operator": "+", "right": "6" }
+                    "rule"  : "root",
+                    "span"  : { "start": 0, "end": 19 },
+                    "value" : [
+                        { "left": { "kind": "num", "value": "1" }, "operator": { "kind": "plus", "value": "+"  }, "right": { "kind": "num", "value": "2" } },
+                        { "left": { "kind": "num", "value": "3" }, "operator": { "kind": "minus", "value": "-" }, "right": { "kind": "num", "value": "4" } },
+                        { "left": { "kind": "num", "value": "5" }, "operator": { "kind": "plus", "value": "+"  }, "right": { "kind": "num", "value": "6" } },
                     ]
                 }
             ],
@@ -189,7 +195,7 @@ import * as parser from '@je-es/parser';
     - #### Handle Errors Gracefully
 
         ```typescript
-        const res = parser.parse(tokens_of_'(1+2', rules, parserSettings);
+        const res = parser.parse(tokens_of_"(1+2", rules, parserSettings);
         console.log(res.errors);
         ```
 
@@ -199,14 +205,14 @@ import * as parser from '@je-es/parser';
             "ast": [],
             "errors":[
                 {
-                    "code"    : "GROUP_ERROR_MISSING_CLOSE",
-                    "msg"     : "Expected closing parenthesis ')'",
-                    "span"    : { "start": 4, "end": 4 }
+                    "code"  : "GROUP_ERROR_MISSING_CLOSE",
+                    "msg"   : "Expected closing parenthesis ")"",
+                    "span"  : { "start": 4, "end": 4 }
                 },
                 {
-                    "code"    : "GROUP_ERROR_MISSING_OPEN",
-                    "msg"     : "Expected opening parenthesis '('",
-                    "span"    : { "start": 1, "end": 2 }
+                    "code"  : "GROUP_ERROR_MISSING_OPEN",
+                    "msg"   : "Expected opening parenthesis "("",
+                    "span"  : { "start": 1, "end": 2 }
                 }
             ]
         }
@@ -215,7 +221,7 @@ import * as parser from '@je-es/parser';
     - #### Error Recovery Example
 
         ```typescript
-        const res = parser.parse(tokens_of_'(+2, (3+4)', rules, parserSettings);
+        const res = parser.parse(tokens_of_"(+2, (3+4)", rules, parserSettings);
         console.log(res.ast[0].groups);
         ```
 
@@ -224,22 +230,27 @@ import * as parser from '@je-es/parser';
         {
             "ast": [
                 {
-                    "rule": "root",
-                    "groups": [
-                        { "left": "3", "operator": "+", "right": "4" }
+                    "rule"  : "root",
+                    "span"  : { "start": 0, "end": 10 },
+                    "value" : [
+                        {
+                            "left"      : { "kind": "num",  "value": "3" },
+                            "operator"  : { "kind": "plus", "value": "+" },
+                            "right"     : { "kind": "num",  "value": "4" }
+                        },
                     ]
                 }
             ],
             "errors": [
                 {
-                    "code"          : "GROUP_ERROR_MISSING_LEFT",
-                    "msg"           : "Expected left operand",
-                    "span"          : { "start": 1, "end": 2 }
+                    "code"  : "GROUP_ERROR_MISSING_LEFT",
+                    "msg"   : "Expected left operand",
+                    "span"  : { "start": 1, "end": 2 }
                 },
                 {
-                    "code"          : "GROUP_ERROR_MISSING_OPEN",
-                    "msg"           : "Expected opening parenthesis '('",
-                    "span"          : { "start": 1, "end": 2 }
+                    "code"  : "GROUP_ERROR_MISSING_OPEN",
+                    "msg"   : "Expected opening parenthesis "("",
+                    "span"  : { "start": 1, "end": 2 }
                 }
             ]
         }
@@ -250,15 +261,15 @@ import * as parser from '@je-es/parser';
     - #### Silent Parsing
         ```typescript
         // Parse patterns silently (no errors added to error list in silent mode)
-        parser.silent(parser.token('optional_token'))
-        parser.loud(parser.token('required_token'))  // Explicit non-silent
+        parser.silent(parser.token("optional_token"))
+        parser.loud(parser.token("required_token"))  // Explicit non-silent
         ```
 
     - #### Pattern Combinators
         ```typescript
         // Various pattern types available
-        parser.token('identifier')                    // Match single token
-        parser.rule('expression')                     // Reference another rule
+        parser.token("identifier")                    // Match single token
+        parser.rule("expression")                     // Reference another rule
         parser.seq(pattern1, pattern2, pattern3)     // Sequence of patterns
         parser.choice(pattern1, pattern2)            // Alternative patterns
         parser.repeat(pattern, 2, 5, separator)      // Repeat with min/max/separator
@@ -276,7 +287,7 @@ import * as parser from '@je-es/parser';
         ]
 
         // Recovery strategies
-        recovery: parser.errorRecoveryStrategies.skipUntil(['semicolon', 'newline'])
+        recovery: parser.errorRecoveryStrategies.skipUntil(["semicolon", "newline"])
         ```
 
     - #### Performance Features
@@ -307,7 +318,7 @@ import * as parser from '@je-es/parser';
     function parse(tokens: Token[], rules: Rules, settings?: ParserSettings): ParseResult
 
     // Creates a rule definition object.
-    function createRule(name: string, pattern: Pattern, options?: Rule['options']): Rule
+    function createRule(name: string, pattern: Pattern, options?: Rule["options"]): Rule
     ```
 
   - #### Pattern Combinators
@@ -361,7 +372,7 @@ import * as parser from '@je-es/parser';
     ```ts
     // Creates a new ErrorHandler pattern that matches when the given condition is true
     //and throws an error with the given message and code.
-    function error( cond: ErrorHandler['cond'], msg: string, code?: number, ): ErrorHandler;
+    function error( cond: ErrorHandler["cond"], msg: string, code?: number, ): ErrorHandler;
     ```
 
     ```ts
@@ -377,11 +388,13 @@ import * as parser from '@je-es/parser';
     ```ts
     // Returns the smallest span that encompasses all the given matches
     // or the span of the first match if there are no matches.
-    function getMatchesSpan(matches: any[]): Span | undefined;
+    function getMatchesSpan(matches: AstNode[]): Span | undefined;
 
-    // Returns a new object that is a shallow copy of the given 'res' object,
-    // but without the 'span' property.
-    function resWithoutSpan(res: any): any;
+    // [TODO]
+    function isOptionalPassed(res: AstNode[]) : boolean
+
+    // [TODO]
+    function getOptional(res: AstNode[], ret: unknown = undefined, index = 0, isSeq = false) : unknown
     ```
 
 
@@ -403,8 +416,8 @@ import * as parser from '@je-es/parser';
 
     // Represents a pattern in the grammar
     interface Pattern {
-        type            : 'token' | 'rule' | 'repeat' | 'choice' | 'seq' | 'optional';
-        [key: string]   : any;
+        type            : "token" | "rule" | "repeat" | "choice" | "seq" | "optional";
+        [key: string]   : unknown;
         silent          : boolean; // Fixed typo: scilent -> silent
     }
 
@@ -417,7 +430,7 @@ import * as parser from '@je-es/parser';
 
     // Represents a recovery strategy
     interface RecoveryStrategy {
-        type            : 'skipUntil';
+        type            : "skipUntil";
         tokens         ?: string[];
         token          ?: string;
     }
@@ -428,7 +441,7 @@ import * as parser from '@je-es/parser';
         pattern         : Pattern;
 
         options        ?: {
-            build      ?: (matches: any[]) => any;
+            build      ?: (matches: AstNode[]) => AstNode;
             errors     ?: ErrorHandler[];
             recovery   ?: RecoveryStrategy;
             ignored    ?: string[];
@@ -448,15 +461,11 @@ import * as parser from '@je-es/parser';
     }
 
     // Represents an AST node
-    type BaseAstNode = {
+    type AstNode = {
         rule            : string;
         span            : Span;
-        value          ?: string | number | boolean | null;
+        value          ?: unknown;
     }
-
-    // With this we can customize the AST for the next stages
-    // depending on your needs
-    type AstNode = BaseAstNode | any;
 
     interface ParseError {
         msg             : string;
@@ -472,13 +481,13 @@ import * as parser from '@je-es/parser';
     }
 
     // Represents a debug level
-    type DebugLevel = 'off' | 'errors' | 'rules' | 'patterns' | 'tokens' | 'verbose';
+    type DebugLevel = "off" | "errors" | "rules" | "patterns" | "tokens" | "verbose";
 
     // Represents a parser settings
     interface ParserSettings {
         startRule       : string;
         errorRecovery  ?: {
-            mode       ?: 'strict' | 'resilient';
+            mode       ?: "strict" | "resilient";
             maxErrors  ?: number;
         };
         ignored        ?: string[];

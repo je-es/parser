@@ -35,8 +35,9 @@
             ),
             {
                 build: (matches) => ({
+                    span: parser.getMatchesSpan(matches),
                     rule: 'root',
-                    groups: matches.map(m => m.meta)
+                    value: matches.map(m => m.value)
                 }),
 
                 // errors: [
@@ -64,8 +65,9 @@
             ),
             {
                 build: (matches) => ({
+                    span: parser.getMatchesSpan(matches),
                     rule: 'group',
-                    meta: {
+                    value: {
                         left        : matches[1].value,
                         operator    : matches[2].value,
                         right       : matches[3].value
@@ -123,9 +125,8 @@
             ast: [
                 {
                     rule: 'root',
-                    groups: [
-                        { left: '1', operator: '+', right: '2' }
-                    ]
+                    span: { start: 0, end: 5 },
+                    value: [ { left: { kind: 'num', value: '1' }, operator: { kind: 'plus', value: '+' }, right: { kind: 'num', value: '2' } } ]
                 }
             ]
         },
@@ -135,10 +136,11 @@
             ast: [
                 {
                     rule: 'root',
-                    groups: [
-                        { left: '1', operator: '+', right: '2' },
-                        { left: '3', operator: '-', right: '4' },
-                        { left: '5', operator: '+', right: '6' }
+                    span: { start: 0, end: 19 },
+                    value: [
+                        { left: { kind: 'num', value: '1' }, operator: { kind: 'plus', value: '+' }, right: { kind: 'num', value: '2' } },
+                        { left: { kind: 'num', value: '3' }, operator: { kind: 'minus', value: '-' }, right: { kind: 'num', value: '4' } },
+                        { left: { kind: 'num', value: '5' }, operator: { kind: 'plus', value: '+' }, right: { kind: 'num', value: '6' } }
                     ]
                 }
             ]
@@ -167,10 +169,9 @@
             ast: [
                 {
                     rule: 'root',
-                    groups: [
-                        { left: '3', operator: '+', right: '4' },
-                    ]
-                }
+                    span: { start: 5, end: 10 },
+                    value: [ { left: { kind: 'num', value: '3' }, operator: { kind: 'plus', value: '+' }, right: { kind: 'num', value: '4' } }, ],
+                 },
             ],
             errors: [
                 {

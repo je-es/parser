@@ -35,9 +35,17 @@
             ),
             {
                 build: (matches) => ({
+                    span: parser.getMatchesSpan(matches),
                     rule: 'root',
-                    groups: matches.map(m => m.meta)
-                })
+                    value: matches.map(m => m.value)
+                }),
+
+                // errors: [
+                //     parser.error(0, "Expected expression", 666)
+                // ],
+
+                recovery: parser.errorRecoveryStrategies.skipUntil(['open']),
+                silent: false
             }
         ),
 
@@ -57,8 +65,9 @@
             ),
             {
                 build: (matches) => ({
+                    span: parser.getMatchesSpan(matches),
                     rule: 'group',
-                    meta: {
+                    value: {
                         left        : matches[1].value,
                         operator    : matches[2].value,
                         right       : matches[3].value
@@ -74,6 +83,7 @@
                 ],
 
                 silent: false,
+                recovery: parser.errorRecoveryStrategies.skipUntil('open')
 
                 // Example: `(+2... (3+4)`
                 // An error occurs after the first `(` due to a missing left operand.
@@ -83,7 +93,6 @@
                 //
                 // Note: In `resilient` mode, the parser halts at the first `(`,
                 // capturing a single error before returning.
-                recovery: parser.errorRecoveryStrategies.skipUntil('open')
             }
         ),
     ];
@@ -94,7 +103,7 @@
 
         // Error recovery mode
         errorRecovery       : {
-            mode            : 'strict',      // 'strict' | 'resilient'
+            mode            : 'resilient',      // 'strict' | 'resilient'
             maxErrors       : 1,                // Stop after N errors (0 = unlimited)
         },
 
@@ -116,9 +125,8 @@
             ast: [
                 {
                     rule: 'root',
-                    groups: [
-                        { left: '1', operator: '+', right: '2' }
-                    ]
+                    span: { start: 0, end: 5 },
+                    value: [ { left: { kind: 'num', value: '1' }, operator: { kind: 'plus', value: '+' }, right: { kind: 'num', value: '2' } } ]
                 }
             ]
         },
@@ -128,10 +136,11 @@
             ast: [
                 {
                     rule: 'root',
-                    groups: [
-                        { left: '1', operator: '+', right: '2' },
-                        { left: '3', operator: '-', right: '4' },
-                        { left: '5', operator: '+', right: '6' }
+                    span: { start: 0, end: 19 },
+                    value: [
+                        { left: { kind: 'num', value: '1' }, operator: { kind: 'plus', value: '+' }, right: { kind: 'num', value: '2' } },
+                        { left: { kind: 'num', value: '3' }, operator: { kind: 'minus', value: '-' }, right: { kind: 'num', value: '4' } },
+                        { left: { kind: 'num', value: '5' }, operator: { kind: 'plus', value: '+' }, right: { kind: 'num', value: '6' } },
                     ]
                 }
             ]
@@ -150,7 +159,17 @@
 
         "Error recovery" : {
             input: '(+2, (3+4)',
-            ast: [],
+            ast: [
+                // This is the expected behavior because we set the maximum number of errors to 1,
+                // and we already have an error, so the Parser stops before reaching here.
+
+                // {
+                //     rule: 'root',
+                //     groups: [
+                //         { left: '3', operator: '+', right: '4' },
+                //     ]
+                // }
+            ],
             errors: [
                 {
                     code    : "GROUP_ERROR_MISSING_LEFT",
