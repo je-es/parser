@@ -38,11 +38,11 @@ declare class Result {
     constructor(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Span);
     clone(): Result;
     static create(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Span): Result;
-    static createAsToken(status?: ResultStatus, source?: Token): Result;
-    static createAsOptional(status?: ResultStatus, source?: Result): Result;
-    static createAsChoice(status?: ResultStatus, source?: Result, index?: number): Result;
-    static createAsRepeat(status?: ResultStatus, source?: Result[]): Result;
-    static createAsSequence(status?: ResultStatus, source?: Result[]): Result;
+    static createAsToken(status?: ResultStatus, source?: Token, span?: Span): Result;
+    static createAsOptional(status?: ResultStatus, source?: Result, span?: Span): Result;
+    static createAsChoice(status?: ResultStatus, source?: Result, index?: number, span?: Span): Result;
+    static createAsRepeat(status?: ResultStatus, source?: Result[], span?: Span): Result;
+    static createAsSequence(status?: ResultStatus, source?: Result[], span?: Span): Result;
     static createAsCustom(status?: ResultStatus, name?: string, data?: unknown, span?: Span): Result;
     withError(err: ParseError): Result;
     isPassed(): boolean;
@@ -51,7 +51,7 @@ declare class Result {
     isUnset(): boolean;
     isToken(): boolean;
     isOptional(): boolean;
-    isOptionalMatched(): boolean;
+    isOptionalPassed(): boolean;
     isChoice(): boolean;
     isRepeat(): boolean;
     isSequence(): boolean;

@@ -12,6 +12,7 @@
     // import { StatementRules }                           from './base/Statement';
     // import { TypeRules }                                from './base/Type';
     import { ExpressionRules }                          from './base/Expression';
+    import { HelpersRules } from './base/Helpers';
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
@@ -140,7 +141,7 @@
         //     parser.oneOrMore(parser.rule('Statement')),
         // ),
 
-    ], ...ExpressionRules as parser.Types.Rules];
+    ], ...HelpersRules as parser.Types.Rules, ...ExpressionRules as parser.Types.Rules];
 
     // ════════ SETTINGS ════════
     export const parserSettings : parser.Types.ParserSettings = {

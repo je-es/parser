@@ -7,7 +7,7 @@
 // ╔════════════════════════════════════════ PACK ════════════════════════════════════════╗
 
     import * as parser from '../../../lib/parser';
-import { Result } from '../../../lib/result';
+    import { Result } from '../../../lib/result';
     import * as Program from '../../libs/program/program';
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
@@ -24,6 +24,8 @@ import { Result } from '../../../lib/result';
 
             parser.createRule('Expression',
                 parser.silent(parser.rule('PrimaryExpression')),
+                // parser.rule('ObjectExpression'),
+                // parser.rule('ComputeExpression'),
                 {
                     build: (data) => data,
 
@@ -37,17 +39,16 @@ import { Result } from '../../../lib/result';
 
             parser.createRule('PrimaryExpression',
                 parser.choice(
-                    // parser.rule('ObjectExpression'),
-                    parser.rule('Literal'),
-                    // parser.rule('IdentifierExpression'),
-                    // parser.rule('ParenthesizedExpression'),
+                    parser.rule('LiteralExpression'),
+                    parser.rule('IdentifierExpression'),
+                    parser.rule('ParenthesizedExpression'),
                 ),
                 {
                     build: (data) => data.getChoiceResult()!,
                 }
             ),
 
-            parser.createRule('Literal',
+            parser.createRule('LiteralExpression',
                 parser.choice(
                     // Integer
                     parser.token('dec'),
@@ -164,49 +165,43 @@ import { Result } from '../../../lib/result';
                 }
             ),
 
-            // parser.createRule('IdentifierExpression',
-            //     parser.choice(
-            //         parser.token('Identifier'),
-            //         parser.seq(
-            //             parser.token('@'),
-            //             parser.token('Identifier'),
-            //         )
-            //     ),
-            //     {
-            //         build: (matches) => {
-            //             console.warn(JSON.stringify(matches, null, 2));
-            //             if (matches.length === 1) {
-            //                 return Program.Expression.createPrimaryIdentifier(
-            //                     matches[0].span,
-            //                     matches[0].value,
-            //                     false
-            //                  );
-            //             } else {
-            //                 return Program.Expression.createPrimaryIdentifier(
-            //                     parser.getMatchesSpan(matches),
-            //                     '@'+matches[1].value,
-            //                     true
-            //                  );
-            //             }
-            //         }
-            //     }
-            // ),
+            parser.createRule('IdentifierExpression',
+                parser.rule('Identifier'),
+                {
+                    build: (data) => {
+                        return Result.createAsCustom('passed',
+                            'identifier-expression',
+                            Program.Expression.createPrimaryIdentifier( data.span, data.getCustomData()! as Program.Identifier),
+                            data.span
+                        );
+                    }
+                }
+            ),
 
-            // parser.createRule('ParenthesizedExpression',
-            //     parser.seq(
-            //         parser.token('('),
-            //         parser.rule('Expression'),
-            //         parser.token(')')
-            //     ),
-            //     {
-            //         build: (matches) => Program.Expression.createPrimaryParen( parser.getMatchesSpan(matches), matches[1] ),
-            //         errors: [
-            //             parser.error(0, "Expected '('"),
-            //             parser.error(1, "Expected expression"),
-            //             parser.error(2, "Expected ')'")
-            //         ]
-            //     }
-            // ),
+            parser.createRule('ParenthesizedExpression',
+                parser.seq(
+                    parser.token('('),
+                    parser.rule('Expression'),
+                    parser.token(')')
+                ),
+                {
+                    build: (data) => {
+
+                        const expr = Program.Expression.createPrimaryParen(
+                            data.span,
+                            data.getSequenceResult()![1].getCustomData()! as Program.Expression
+                        );
+
+                        return Result.createAsCustom('passed', 'paren-expression', expr, data.span);
+
+                    },
+                    errors: [
+                        parser.error(0, "Expected '('"),
+                        parser.error(1, "Expected expression"),
+                        parser.error(2, "Expected ')'")
+                    ]
+                }
+            ),
 
             // parser.createRule('ObjectExpression',
             //     parser.seq(

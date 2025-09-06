@@ -36,7 +36,7 @@ var Result = class _Result {
   constructor(status, source, mode, span) {
     // ┌──────────────────────────────── INIT ──────────────────────────────┐
     // Core data
-    this.span = { start: -1, end: -1 };
+    this.span = { start: -99, end: -99 };
     this.status = "unset";
     this.source = null;
     this.mode = "unset";
@@ -44,7 +44,7 @@ var Result = class _Result {
     this.status = status != null ? status : "unset";
     this.source = source != null ? source : null;
     this.mode = mode != null ? mode : "unset";
-    this.span = span != null ? span : { start: -1, end: -1 };
+    this.span = span != null ? span : { start: -88, end: -88 };
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌──────────────────────────────── MAIN ──────────────────────────────┐
@@ -58,7 +58,7 @@ var Result = class _Result {
   static create(status, source, mode, span) {
     return new _Result(status, source, mode, span);
   }
-  static createAsToken(status, source) {
+  static createAsToken(status, source, span) {
     var _a, _b, _c;
     const newSource = {
       source_kind: "token-source",
@@ -66,42 +66,42 @@ var Result = class _Result {
       value: (_b = source == null ? void 0 : source.value) != null ? _b : void 0,
       span: (_c = source == null ? void 0 : source.span) != null ? _c : void 0
     };
-    return _Result.create(status, newSource, "token", newSource.span);
+    return _Result.create(status, newSource, "token", span != null ? span : newSource.span);
   }
-  static createAsOptional(status, source) {
+  static createAsOptional(status, source, span) {
     const newSource = {
       source_kind: "optional-source",
       result: source != null ? source : null
     };
-    return _Result.create(status, newSource, "optional", source == null ? void 0 : source.span);
+    return _Result.create(status, newSource, "optional", span != null ? span : source == null ? void 0 : source.span);
   }
-  static createAsChoice(status, source, index) {
+  static createAsChoice(status, source, index, span) {
     const newSource = {
       source_kind: "choice-source",
       atIndex: index != null ? index : -1,
       result: source != null ? source : null
     };
-    return _Result.create(status, newSource, "choice", source == null ? void 0 : source.span);
+    return _Result.create(status, newSource, "choice", span != null ? span : source == null ? void 0 : source.span);
   }
-  static createAsRepeat(status, source) {
+  static createAsRepeat(status, source, span) {
     const newSource = {
       source_kind: "repeat-source",
       result: source != null ? source : []
     };
-    const full_span = { start: -1, end: -1 };
-    full_span.start = source && source.length ? source[0].span.start : -1;
-    full_span.end = source && source.length ? source[source.length - 1].span.end : -1;
-    return _Result.create(status, newSource, "repeat", full_span);
+    const full_span = { start: -9, end: -9 };
+    full_span.start = source && source.length ? source[0].span.start : -8;
+    full_span.end = source && source.length ? source[source.length - 1].span.end : -7;
+    return _Result.create(status, newSource, "repeat", span != null ? span : full_span);
   }
-  static createAsSequence(status, source) {
+  static createAsSequence(status, source, span) {
     const newSource = {
       source_kind: "sequence-source",
       result: source != null ? source : []
     };
-    const full_span = { start: -1, end: -1 };
-    full_span.start = source && source.length ? source[0].span.start : -1;
-    full_span.end = source && source.length ? source[source.length - 1].span.end : -1;
-    return _Result.create(status, newSource, "seq", full_span);
+    const full_span = { start: -6, end: -6 };
+    full_span.start = source && source.length ? source[0].span.start : -5;
+    full_span.end = source && source.length ? source[source.length - 1].span.end : -4;
+    return _Result.create(status, newSource, "seq", span != null ? span : full_span);
   }
   static createAsCustom(status, name, data, span) {
     const newSource = {
@@ -122,7 +122,7 @@ var Result = class _Result {
   }
   isFullyPassed() {
     if (!this.isPassed()) return false;
-    if (this.isOptional() && !this.isOptionalMatched()) return false;
+    if (this.isOptional() && !this.isOptionalPassed()) return false;
     return true;
   }
   isFailed() {
@@ -137,7 +137,7 @@ var Result = class _Result {
   isOptional() {
     return this.mode === "optional";
   }
-  isOptionalMatched() {
+  isOptionalPassed() {
     return this.isOptional() && this.source.result !== null;
   }
   isChoice() {
@@ -186,7 +186,7 @@ var Result = class _Result {
     return void 0;
   }
   getOptionalResult() {
-    if (this.isOptionalMatched()) {
+    if (this.isOptionalPassed()) {
       return this.source.result;
     }
     return void 0;
@@ -390,7 +390,7 @@ var Parser = class _Parser {
       if (isOptionalContext) {
         this.index = startIndex;
         this.log("patterns", `${"  ".repeat(this.indentLevel)}\u2717 ${pattern.type} (optional context, suppressed) \u2192 ${startIndex}`);
-        return Result.createAsOptional();
+        return Result.createAsOptional("failed", void 0, this.getCurrentSpan());
       }
       throw error2;
     } finally {
@@ -424,7 +424,7 @@ var Parser = class _Parser {
     if (this.index >= this.tokens.length) {
       this.log("tokens", `\u2717 Expected '${tokenName}', got 'EOF' @${this.index}`);
       if (shouldBeSilent) {
-        return Result.createAsToken();
+        return Result.create("failed", void 0, void 0, this.getCurrentSpan());
       }
       const error3 = this.createError(
         ERRORS.TOKEN_EXPECTED_EOF,
@@ -444,11 +444,11 @@ var Parser = class _Parser {
       this.index++;
       this.stats.tokensProcessed++;
       this.log("tokens", `\u2713 ${tokenName} = "${token2.value}" @${this.index - 1}`);
-      return Result.createAsToken("passed", consumedToken);
+      return Result.createAsToken("passed", consumedToken, consumedToken.span);
     }
     this.log("tokens", `\u2717 Expected '${tokenName}', got '${token2.kind}' @${this.lastVisitedIndex}`);
     if (shouldBeSilent) {
-      return Result.createAsToken();
+      return Result.create("failed", void 0, void 0, token2.span);
     }
     const error2 = this.createError(
       ERRORS.TOKEN_MISMATCH,
@@ -475,7 +475,7 @@ var Parser = class _Parser {
       this.patternStack.pop();
       const error2 = new Error(`Rule '${ruleName}' not found`);
       this.handleFatalError(error2);
-      return Result.create("failed").withError(this.fetalErrorToParseError(error2));
+      return Result.create("failed", void 0, void 0, this.getCurrentSpan()).withError(this.fetalErrorToParseError(error2));
     }
     const startIndex = this.index;
     const savedErrors = [...this.errors];
@@ -489,7 +489,7 @@ var Parser = class _Parser {
           this.log("rules", `\u2717 ${ruleName} (silent) @${this.lastVisitedIndex}`);
           this.ruleStack.pop();
           this.patternStack.pop();
-          return Result.create("failed");
+          return Result.create("failed", void 0, void 0, result.span);
         }
         const error2 = this.createError(
           ERRORS.RULE_FAILED,
@@ -503,7 +503,7 @@ var Parser = class _Parser {
         this.ruleStack.pop();
         this.patternStack.pop();
         const finalError = this.getCustomErrorOr(parentRule, error2);
-        return Result.create("failed").withError(finalError);
+        return Result.create("failed", void 0, void 0, result.span).withError(finalError);
       }
       let finalResult = result;
       if (result !== null && ((_a = targetRule.options) == null ? void 0 : _a.build)) {
@@ -528,7 +528,7 @@ var Parser = class _Parser {
       if (shouldBeSilent) {
         this.index = startIndex;
         this.errors = savedErrors;
-        return Result.create("failed");
+        return Result.create("failed", void 0, void 0, this.getCurrentSpan());
       }
       if (e instanceof Error) {
         this.handleFatalError(e);
@@ -536,9 +536,10 @@ var Parser = class _Parser {
         this.handleParseError(e, parentRule);
       }
     }
-    return Result.create("failed");
+    return Result.create("failed", void 0, void 0, this.getCurrentSpan());
   }
   parseOptional(pattern, parentRule) {
+    var _a;
     this.log("verbose", `OPTIONAL @${this.index}`);
     this.lastHandledRule = "optional";
     this.lastVisitedIndex = this.index;
@@ -548,18 +549,18 @@ var Parser = class _Parser {
       const result = this.parsePattern(pattern, parentRule);
       if (result.isFullyPassed()) {
         this.log("verbose", `\u2713 OPTIONAL \u2192 [1 element] @${this.index}`);
-        return Result.createAsOptional("passed", result);
+        return Result.createAsOptional("passed", result, result.span);
       } else {
         this.index = startIndex;
         this.errors = savedErrors;
         this.log("verbose", `\u2713 OPTIONAL \u2192 [] (pattern returned null) @${this.index}`);
-        return Result.createAsOptional("passed");
+        return Result.createAsOptional("passed", void 0, (_a = result.span) != null ? _a : this.getCurrentSpan());
       }
     } catch (e) {
       this.index = startIndex;
       this.errors = savedErrors;
       this.log("verbose", `\u2713 OPTIONAL \u2192 [] (exception caught: ${e.msg || e}) @${this.index}`);
-      return Result.createAsOptional("passed");
+      return Result.createAsOptional("passed", void 0, this.getCurrentSpan());
     }
   }
   parseChoice(patterns, parentRule, shouldBeSilent) {
@@ -609,7 +610,7 @@ var Parser = class _Parser {
     this.index = startIndex;
     this.errors = savedErrors;
     if (shouldBeSilent) {
-      return Result.create("failed");
+      return Result.create("failed", void 0, void 0, this.getCurrentSpan());
     }
     if (bestResult) {
       const bestError = bestResult.errors.length > 0 ? bestResult.errors[bestResult.errors.length - 1] : this.createError(
@@ -702,7 +703,7 @@ var Parser = class _Parser {
     }
     if (results.length < min) {
       if (shouldBeSilent) {
-        return Result.create("failed");
+        return Result.create("failed", void 0, void 0, this.getCurrentSpan());
       }
       if ((_b = parentRule == null ? void 0 : parentRule.options) == null ? void 0 : _b.errors) {
         const customError = this.getCustomErrorForCondition(parentRule, 0, this.index, startIndex);
@@ -721,14 +722,17 @@ var Parser = class _Parser {
       throw error2;
     }
     this.log("verbose", `REPEAT \u2192 [${results.length}] @${this.index}`);
-    return Result.createAsRepeat("passed", results);
+    return Result.createAsRepeat("passed", results, results.length ? {
+      start: results[0].span.start,
+      end: results[results.length - 1].span.end
+    } : this.getCurrentSpan());
   }
   parseSequence(patterns, parentRule, shouldBeSilent) {
     var _a;
     this.log("verbose", `SEQUENCE[${patterns.length}] @${this.index}`);
     this.lastVisitedIndex = this.index;
     if (patterns.length === 0) {
-      return Result.create("failed");
+      return Result.create("failed", void 0, void 0, this.getCurrentSpan());
     }
     const startIndex = this.index;
     const savedErrors = [...this.errors];
@@ -739,11 +743,11 @@ var Parser = class _Parser {
         const pattern = patterns[lastPatternIndex];
         const beforePatternIndex = this.index;
         const result = this.parsePattern(pattern, parentRule);
-        if (!result.isFullyPassed()) {
+        if (!result.isPassed()) {
           if (shouldBeSilent) {
             this.index = startIndex;
             this.errors = savedErrors;
-            return Result.create("failed");
+            return Result.create("failed", void 0, void 0, result.span);
           }
           const error2 = this.createError(
             ERRORS.SEQUENCE_FAILED,
@@ -762,7 +766,10 @@ var Parser = class _Parser {
         this.skipIgnored((_a = parentRule == null ? void 0 : parentRule.options) == null ? void 0 : _a.ignored);
       }
       this.log("verbose", `SEQUENCE \u2192 [${results.length}] @${this.lastVisitedIndex}`);
-      return Result.createAsSequence("passed", results);
+      return Result.createAsSequence("passed", results, results.length ? {
+        start: results[0].span.start,
+        end: results[results.length - 1].span.end
+      } : this.getCurrentSpan());
     } catch (e) {
       this.index = startIndex;
       this.errors = savedErrors;
@@ -774,7 +781,7 @@ var Parser = class _Parser {
           this.handleParseError(error2, parentRule);
         }
       }
-      return Result.create("failed");
+      return Result.create("failed", void 0, void 0, this.getCurrentSpan());
     }
   }
   safeBuild(buildFn, matches) {

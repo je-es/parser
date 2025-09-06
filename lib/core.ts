@@ -227,7 +227,7 @@
 
                         this.log('patterns', `${'  '.repeat(this.indentLevel)}✗ ${pattern.type} (optional context, suppressed) → ${startIndex}`);
 
-                        return Result.createAsOptional();
+                        return Result.createAsOptional('failed', undefined, this.getCurrentSpan());
                     }
                     throw error;
                 } finally {
@@ -264,7 +264,7 @@
                 if (this.index >= this.tokens.length) {
                     this.log('tokens', `✗ Expected '${tokenName}', got 'EOF' @${this.index}`);
 
-                    if (shouldBeSilent) { return Result.createAsToken(); }
+                    if (shouldBeSilent) { return Result.create('failed', undefined, undefined, this.getCurrentSpan()); }
 
                     const error = this.createError(
                         Types.ERRORS.TOKEN_EXPECTED_EOF,
@@ -286,12 +286,12 @@
                     this.index++;
                     this.stats.tokensProcessed++;
                     this.log('tokens', `✓ ${tokenName} = "${token.value}" @${this.index - 1}`);
-                    return Result.createAsToken('passed', consumedToken);
+                    return Result.createAsToken('passed', consumedToken, consumedToken.span);
                 }
 
                 this.log('tokens', `✗ Expected '${tokenName}', got '${token.kind}' @${this.lastVisitedIndex}`);
 
-                if (shouldBeSilent) { return Result.createAsToken(); }
+                if (shouldBeSilent) { return Result.create('failed', undefined, undefined, token.span); }
 
                 const error = this.createError(
                     Types.ERRORS.TOKEN_MISMATCH,
@@ -320,7 +320,7 @@
                     this.patternStack.pop();
                     const error = new Error(`Rule '${ruleName}' not found`);
                     this.handleFatalError(error);
-                    return Result.create('failed').withError(this.fetalErrorToParseError(error));
+                    return Result.create('failed', undefined, undefined, this.getCurrentSpan()).withError(this.fetalErrorToParseError(error));
                 }
 
                 const startIndex = this.index;
@@ -339,7 +339,7 @@
                             this.log('rules', `✗ ${ruleName} (silent) @${this.lastVisitedIndex}`);
                             this.ruleStack.pop();
                             this.patternStack.pop();
-                            return Result.create('failed');
+                            return Result.create('failed', undefined, undefined, result.span);
                         }
 
                         const error = this.createError(
@@ -355,7 +355,7 @@
                         this.ruleStack.pop();
                         this.patternStack.pop();
                         const finalError = this.getCustomErrorOr(parentRule, error);
-                        return Result.create('failed').withError(finalError);
+                        return Result.create('failed', undefined, undefined, result.span).withError(finalError);
                     }
 
                     let finalResult = result;
@@ -386,7 +386,7 @@
                     if (shouldBeSilent) {
                         this.index = startIndex;
                         this.errors = savedErrors;
-                        return Result.create('failed');
+                        return Result.create('failed', undefined, undefined, this.getCurrentSpan());
                     }
 
                     if (e instanceof Error) {
@@ -396,7 +396,7 @@
                     }
                 }
 
-                return Result.create('failed');
+                return Result.create('failed', undefined, undefined, this.getCurrentSpan());
             }
 
             private parseOptional(pattern: Types.Pattern, parentRule?: Types.Rule): Result {
@@ -416,7 +416,7 @@
                         // Success case - return array with the result
                         this.log('verbose', `✓ OPTIONAL → [1 element] @${this.index}`);
 
-                        return Result.createAsOptional('passed', result);
+                        return Result.createAsOptional('passed', result, result.span);
                     } else {
                         // Failure case - this is a normal failure for optional
                         // Reset to start position since we didn't consume anything useful
@@ -425,7 +425,7 @@
 
                         this.log('verbose', `✓ OPTIONAL → [] (pattern returned null) @${this.index}`);
 
-                        return Result.createAsOptional('passed');
+                        return Result.createAsOptional('passed', undefined, result.span ?? this.getCurrentSpan());
                     }
                 } catch (e) {
                     this.index  = startIndex;
@@ -433,7 +433,7 @@
 
                     this.log('verbose', `✓ OPTIONAL → [] (exception caught: ${(e as Types.ParseError).msg || e}) @${this.index}`);
 
-                    return Result.createAsOptional('passed');
+                    return Result.createAsOptional('passed', undefined, this.getCurrentSpan());
                 }
             }
 
@@ -502,7 +502,7 @@
                 this.index = startIndex;
                 this.errors = savedErrors;
 
-                if (shouldBeSilent) { return Result.create('failed'); }
+                if (shouldBeSilent) { return Result.create('failed', undefined, undefined, this.getCurrentSpan()); }
 
                 if (bestResult) {
                     const bestError = bestResult.errors.length > 0
@@ -622,7 +622,7 @@
 
                 // Check minimum requirement and create appropriate error
                 if (results.length < min) {
-                    if (shouldBeSilent) { return Result.create('failed'); }
+                    if (shouldBeSilent) { return Result.create('failed', undefined, undefined, this.getCurrentSpan()); }
 
                     // Check if we should use a custom error from the parent rule
                     if (parentRule?.options?.errors) {
@@ -646,14 +646,17 @@
 
                 this.log('verbose', `REPEAT → [${results.length}] @${this.index}`);
 
-                return Result.createAsRepeat('passed', results);
+                return Result.createAsRepeat('passed', results, results.length ? {
+                        start: results[0].span.start,
+                        end: results[results.length-1].span.end
+                } : this.getCurrentSpan());
             }
 
             private parseSequence(patterns: Types.Pattern[], parentRule?: Types.Rule, shouldBeSilent?: boolean): Result {
                 this.log('verbose', `SEQUENCE[${patterns.length}] @${this.index}`);
                 this.lastVisitedIndex = this.index;
 
-                if (patterns.length === 0) { return Result.create('failed'); }
+                if (patterns.length === 0) { return Result.create('failed', undefined, undefined, this.getCurrentSpan()); }
 
                 const startIndex  = this.index;
                 const savedErrors = [...this.errors];
@@ -667,11 +670,12 @@
 
                         const result = this.parsePattern(pattern, parentRule);
 
-                        if (!result.isFullyPassed()) {
+                        // Not isFullyPassed, optional must ignored here.
+                        if (!result.isPassed()) {
                             if (shouldBeSilent) {
                                 this.index  = startIndex;
                                 this.errors = savedErrors;
-                                return Result.create('failed');
+                                return Result.create('failed', undefined, undefined, result.span);
                             }
 
                             const error = this.createError(
@@ -696,7 +700,10 @@
                     }
 
                     this.log('verbose', `SEQUENCE → [${results.length}] @${this.lastVisitedIndex}`);
-                    return Result.createAsSequence('passed', results);
+                    return Result.createAsSequence('passed', results, results.length ? {
+                        start: results[0].span.start,
+                        end: results[results.length-1].span.end
+                    } : this.getCurrentSpan());
 
                 } catch (e) {
                     this.index  = startIndex;
@@ -711,7 +718,7 @@
                         }
                     }
 
-                    return Result.create('failed');
+                    return Result.create('failed', undefined, undefined, this.getCurrentSpan());
                 }
             }
 

@@ -8,6 +8,7 @@
 
     import { Span, NodeVisitor, Node } from './base';
     import { Field } from './Field';
+import { Identifier } from './Identifier';
     import { Statement } from './Statement';
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
@@ -59,8 +60,7 @@
     // ═══════ Ident ═══════
     export interface IdentSource {
         kind            : 'Identifier';
-        value           : string;
-        builtin         : boolean;
+        value           : Identifier;
     }
 
     // ═══════ Object ═══════
@@ -299,14 +299,14 @@
 
             getPrimaryIdentifierName(): string | undefined {
                 if (this.isPrimaryIdentifier()) {
-                    return ((this.source as PrimarySource).source as IdentSource).value;
+                    return (((this.source as PrimarySource).source as IdentSource).value as Identifier).name;
                 }
                 return undefined;
             }
 
             getPrimaryIdentifierIsBuiltin(): boolean | undefined {
                 if (this.isPrimaryIdentifier()) {
-                    return ((this.source as PrimarySource).source as IdentSource).builtin;
+                    return (((this.source as PrimarySource).source as IdentSource).value as Identifier).builtin;
                 }
                 return undefined;
             }
@@ -743,8 +743,8 @@
                 return this.createPrimaryLiteral(span, 'Array', [...elements]);
             }
 
-            static createPrimaryIdentifier(span: Span, value: string, builtin = false): Expression {
-                return this.createPrimary(span, { kind: 'Identifier', source: { kind: 'Identifier', value, builtin } });
+            static createPrimaryIdentifier(span: Span, identifier: Identifier): Expression {
+                return this.createPrimary(span, { kind: 'Identifier', source: { kind: 'Identifier', value: identifier } });
             }
 
             static createPrimaryParen(span: Span, expression: Expression): Expression {

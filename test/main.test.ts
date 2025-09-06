@@ -179,7 +179,7 @@
                 expect(res.ast[0]).toBeInstanceOf(Types.Result);
                 expect(res.ast[0].hasErrors()).toEqual(false);
                 expect(res.ast[0].isOptional()).toEqual(true);
-                expect(res.ast[0].isOptionalMatched()).toEqual(true);
+                expect(res.ast[0].isOptionalPassed()).toEqual(true);
 
                 const optionalResult = res.ast[0].getOptionalResult()!;
                 expect(optionalResult.isToken()).toEqual(true);
@@ -201,7 +201,7 @@
                 expect(res.ast[0]).toBeInstanceOf(Types.Result);
                 expect(res.ast[0].hasErrors()).toEqual(false);
                 expect(res.ast[0].isOptional()).toEqual(true);
-                expect(res.ast[0].isOptionalMatched()).toEqual(false);
+                expect(res.ast[0].isOptionalPassed()).toEqual(false);
 
                 expect(res.errors.length).toEqual(0);
             });
@@ -218,7 +218,7 @@
                         build: (data) => {
 
                             // check the build process errors if handled correctly.
-                            if(!data.isOptionalMatched()){
+                            if(!data.isOptionalPassed()){
                                 throw new Error("Cannot building without providing a value");
                             }
 
@@ -266,7 +266,7 @@
                 expect(res.ast[0].hasErrors()).toEqual(false); // errors handled by ParserResult[errors]
                 expect(res.ast[0].isFailed()).toEqual(false);
                 expect(res.ast[0].isPassed()).toEqual(true); // optional always passed.
-                expect(res.ast[0].isOptionalMatched()).toEqual(false); // but we can handle it like this.
+                expect(res.ast[0].isOptionalPassed()).toEqual(false); // but we can handle it like this.
 
                 expect(res.errors).toEqual([
                     {

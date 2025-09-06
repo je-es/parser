@@ -15,7 +15,8 @@
 // ╔════════════════════════════════════════ TYPE ════════════════════════════════════════╗
 
     export interface IdentifierOptions {
-        name : string;
+        name    : string;
+        builtin : boolean
     }
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
@@ -30,7 +31,7 @@
 
             constructor(
                 public readonly span        : Span,
-                public readonly options     : IdentifierOptions = { name: 'Unset' }
+                public readonly options     : IdentifierOptions = { name: 'Unset', builtin: false }
             ) { super(); }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -40,6 +41,7 @@
 
             public readonly kind = 'Identifier';
             get name    (): string      { return this.options.name; }
+            get builtin (): boolean     { return this.options.builtin; }
 
         // └────────────────────────────────────────────────────────────────────┘
 
@@ -85,8 +87,8 @@
 
         // ┌─────────────────────────────── Factory ────────────────────────────┐
 
-            static create(span: Span, name: string): Identifier {
-                return new Identifier(span, { name });
+            static create(span: Span, name: string, builtin: boolean = false): Identifier {
+                return new Identifier(span, { name, builtin });
             }
 
         // └────────────────────────────────────────────────────────────────────┘

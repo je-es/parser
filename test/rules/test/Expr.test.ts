@@ -94,27 +94,37 @@
             },
         ],
 
-        // PrimaryIdentifier : [
-        //     // {
-        //     //     input       : 'foo',
-        //     //     output      : Program.Expression.createPrimaryIdentifier({ start: 0, end: 3 }, 'foo', false),
-        //     // },
-        //     // {
-        //     //     input       : '@bar',
-        //     //     output      : Program.Expression.createPrimaryIdentifier({ start: 0, end: 4 }, '@bar', true),
-        //     // },
-        // ],
+        PrimaryIdentifier : [
+            {
+                input       : 'foo',
+                output      : Program.Expression.createPrimaryIdentifier({ start: 0, end: 3 },
+                    Program.Identifier.create({start: 0, end: 3},
+                        'foo')),
+            },
+            {
+                input       : '@bar',
+                output      : Program.Expression.createPrimaryIdentifier({ start: 0, end: 4 },
+                    Program.Identifier.create({start: 1, end: 4},
+                        'bar', true)),
+            },
+        ],
 
-        // PrimaryParen : [
-        //     {
-        //         input       : '(foo)',
-        //         output      : Program.Expression.createPrimaryParen({ start: 0, end: 5 }, Program.Expression.createPrimaryIdentifier({ start: 1, end: 4 }, 'foo', false)),
-        //     },
-        //     {
-        //         input       : '(@bar)',
-        //         output      : Program.Expression.createPrimaryParen({ start: 0, end: 6 }, Program.Expression.createPrimaryIdentifier({ start: 1, end: 5 }, '@bar', true)),
-        //     },
-        // ],
+        PrimaryParen : [
+            {
+                input       : '(foo)',
+                output      : Program.Expression.createPrimaryParen({ start: 0, end: 5 },
+                    Program.Expression.createPrimaryIdentifier({ start: 1, end: 4 },
+                    Program.Identifier.create({start: 1, end: 4},
+                        'foo'))),
+            },
+            {
+                input       : '(@bar)',
+                output      : Program.Expression.createPrimaryParen({ start: 0, end: 6 },
+                    Program.Expression.createPrimaryIdentifier({ start: 1, end: 5 },
+                        Program.Identifier.create({start: 2, end: 5},
+                            'bar', true))),
+            },
+        ],
 
         // PrimaryObject : [
         //     // empty object
@@ -1650,7 +1660,7 @@
                 const success = !Array.isArray(output);
                 it(input, () => {
                     const result : ParseResult = Expr.parse(input);
-                    // console.log(JSON.stringify(result, null, 2));
+                    console.log(JSON.stringify(result, null, 2));
 
                     if (success) {
                         expect(result.ast[0].getCustomData()!).toEqual(output);
