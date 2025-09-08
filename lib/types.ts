@@ -36,6 +36,7 @@
     export interface Pattern {
         type            : 'token' | 'rule' | 'repeat' | 'choice' | 'seq' | 'optional';
         silent          : boolean;
+        value          ?: string;       // for token
         name           ?: string;       // for rule and token
         min            ?: number;       // for repeat
         max            ?: number;       // for repeat

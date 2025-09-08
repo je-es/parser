@@ -184,8 +184,13 @@ var Result = class _Result {
   isSequence() {
     return this.mode === "seq";
   }
-  isCustom() {
-    return this.mode === "custom";
+  isCustom(tag) {
+    if (this.mode === "custom") {
+      if (tag) {
+        return this.source.tag == tag;
+      } else return true;
+    }
+    return false;
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌────────────────────────────── GETTERS ─────────────────────────────┐
@@ -437,7 +442,7 @@ var Parser = class _Parser {
   executePattern(pattern, parentRule, shouldBeSilent) {
     switch (pattern.type) {
       case "token":
-        return this.parseToken(pattern.name, parentRule, shouldBeSilent);
+        return this.parseToken(pattern.name, pattern.value, parentRule, shouldBeSilent);
       case "rule":
         return this.parseRule(pattern.name, parentRule, shouldBeSilent);
       case "repeat":
@@ -452,7 +457,7 @@ var Parser = class _Parser {
         throw new Error(`Unknown pattern type: ${pattern.type}`);
     }
   }
-  parseToken(tokenName, parentRule, shouldBeSilent) {
+  parseToken(tokenName, tokenValue, parentRule, shouldBeSilent) {
     this.lastHandledRule = (parentRule == null ? void 0 : parentRule.name) || tokenName;
     this.log("tokens", `\u2192 ${tokenName} @${this.index}`);
     this.lastVisitedIndex = this.index;
@@ -475,11 +480,24 @@ var Parser = class _Parser {
     }
     const token2 = this.getCurrentToken();
     if (token2.kind === tokenName) {
-      const consumedToken = __spreadValues({}, token2);
-      this.index++;
-      this.stats.tokensProcessed++;
-      this.log("tokens", `\u2713 ${tokenName} = "${token2.value}" @${this.index - 1}`);
-      return Result.createAsToken("passed", consumedToken, consumedToken.span);
+      if (tokenValue && token2.value !== tokenValue) {
+        const error3 = this.createError(
+          ERRORS.TOKEN_MISMATCH,
+          `Expected '${tokenName}' with value '${tokenValue}', got '${token2.value}'`,
+          this.getCurrentSpan(),
+          0,
+          this.index,
+          this.lastHandledRule,
+          this.getInnerMostRule()
+        );
+        this.handleParseError(error3, parentRule);
+      } else {
+        const consumedToken = __spreadValues({}, token2);
+        this.index++;
+        this.stats.tokensProcessed++;
+        this.log("tokens", `\u2713 ${tokenName} = "${token2.value}" @${this.index - 1}`);
+        return Result.createAsToken("passed", consumedToken, consumedToken.span);
+      }
     }
     this.log("tokens", `\u2717 Expected '${tokenName}', got '${token2.kind}' @${this.lastVisitedIndex}`);
     if (shouldBeSilent) {
@@ -1346,7 +1364,7 @@ var Parser = class _Parser {
     }
     switch (pattern.type) {
       case "token":
-        return `${baseKey}:${pattern.name}`;
+        return `${baseKey}:${pattern.name}:${pattern.value || ""}`;
       case "optional":
         return `${baseKey}:optional`;
       case "repeat":
@@ -1474,20 +1492,20 @@ function parse(tokens, rules, settings) {
   }
 }
 var createRule = (name, pattern, options = {}) => {
-  const finalOptions = __spreadValues({ name, silent: false }, options);
+  const finalOptions = __spreadValues({ name: false }, options);
   return { name, pattern, options: finalOptions };
 };
-function token(name, silent2 = false) {
+function token(name, value) {
   if (!name || typeof name !== "string") {
     throw new Error("Token name must be a non-empty string");
   }
-  return { type: "token", name, silent: silent2 };
+  return { type: "token", name, value, silent: false };
 }
-function optional(pattern, silent2 = false) {
+function optional(pattern) {
   if (!pattern || typeof pattern !== "object") {
     throw new Error("Optional pattern must be a valid pattern");
   }
-  return { type: "optional", pattern, silent: silent2 };
+  return { type: "optional", pattern, silent: false };
 }
 function choice(...patterns) {
   if (patterns.length === 0) {
@@ -1495,23 +1513,23 @@ function choice(...patterns) {
   }
   return { type: "choice", patterns, silent: false };
 }
-function repeat(pattern, min = 0, max = Infinity, separator, silent2 = false) {
+function repeat(pattern, min = 0, max = Infinity, separator) {
   if (min < 0) {
     throw new Error("Minimum repetition count cannot be negative");
   }
   if (max < min) {
     throw new Error("Maximum repetition count cannot be less than minimum");
   }
-  return { type: "repeat", pattern, min, max, separator, silent: silent2 };
+  return { type: "repeat", pattern, min, max, separator, silent: false };
 }
-function oneOrMore(pattern, separator, silent2 = false) {
-  return repeat(pattern, 1, Infinity, separator, silent2);
+function oneOrMore(pattern, separator) {
+  return repeat(pattern, 1, Infinity, separator);
 }
-function zeroOrMore(pattern, separator, silent2 = false) {
-  return repeat(pattern, 0, Infinity, separator, silent2);
+function zeroOrMore(pattern, separator) {
+  return repeat(pattern, 0, Infinity, separator);
 }
-function zeroOrOne(pattern, separator, silent2 = true) {
-  return repeat(pattern, 0, 1, separator, silent2);
+function zeroOrOne(pattern, separator) {
+  return silent(repeat(pattern, 0, 1, separator));
 }
 function seq(...patterns) {
   if (patterns.length === 0) {
@@ -1519,11 +1537,11 @@ function seq(...patterns) {
   }
   return { type: "seq", patterns, silent: false };
 }
-function rule(name, silent2 = false) {
+function rule(name) {
   if (!name || typeof name !== "string") {
     throw new Error("Rule name must be a non-empty string");
   }
-  return { type: "rule", name, silent: silent2 };
+  return { type: "rule", name, silent: false };
 }
 function silent(pattern) {
   return __spreadProps(__spreadValues({}, pattern), { silent: true });

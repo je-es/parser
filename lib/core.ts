@@ -76,6 +76,7 @@
         // ┌──────────────────────────────── MAIN ──────────────────────────────┐
 
             parse(tokens: Types.Token[]): Types.ParseResult {
+
                 this.resetState(tokens);
                 this.startTime = Date.now();
                 this.log('rules', `🚀 Parse started: ${tokens.length} tokens`);
@@ -240,7 +241,7 @@
             private executePattern(pattern: Types.Pattern, parentRule?: Types.Rule, shouldBeSilent?: boolean): Result {
                 switch (pattern.type) {
                     case 'token':
-                        return this.parseToken(pattern.name!, parentRule, shouldBeSilent);
+                        return this.parseToken(pattern.name!, pattern.value!, parentRule, shouldBeSilent);
                     case 'rule':
                         return this.parseRule(pattern.name!, parentRule, shouldBeSilent);
                     case 'repeat':
@@ -256,7 +257,7 @@
                 }
             }
 
-            private parseToken(tokenName: string, parentRule?: Types.Rule, shouldBeSilent?: boolean): Result {
+            private parseToken(tokenName: string, tokenValue?: string, parentRule?: Types.Rule, shouldBeSilent?: boolean): Result {
                 this.lastHandledRule = parentRule?.name || tokenName;
                 this.log('tokens', `→ ${tokenName} @${this.index}`);
                 this.lastVisitedIndex = this.index;
@@ -282,11 +283,25 @@
                 const token = this.getCurrentToken();
 
                 if (token.kind === tokenName) {
-                    const consumedToken = { ...token };
-                    this.index++;
-                    this.stats.tokensProcessed++;
-                    this.log('tokens', `✓ ${tokenName} = "${token.value}" @${this.index - 1}`);
-                    return Result.createAsToken('passed', consumedToken, consumedToken.span);
+                    if(tokenValue && token.value !== tokenValue) {
+                        const error = this.createError(
+                            Types.ERRORS.TOKEN_MISMATCH,
+                            `Expected '${tokenName}' with value '${tokenValue}', got '${token.value}'`,
+                            this.getCurrentSpan(),
+                            0,
+                            this.index,
+                            this.lastHandledRule!,
+                            this.getInnerMostRule()
+                        );
+                        this.handleParseError(error, parentRule);
+                    }
+                    else {
+                        const consumedToken = { ...token };
+                        this.index++;
+                        this.stats.tokensProcessed++;
+                        this.log('tokens', `✓ ${tokenName} = "${token.value}" @${this.index - 1}`);
+                        return Result.createAsToken('passed', consumedToken, consumedToken.span);
+                    }
                 }
 
                 this.log('tokens', `✗ Expected '${tokenName}', got '${token.kind}' @${this.lastVisitedIndex}`);
@@ -1314,7 +1329,7 @@
             private createMemoKey(pattern: Types.Pattern, position: number, ruleName?: string): string {
                 const silentContext = this.isInSilentMode() ? 'S' : 'L';
                 const errorContext = this.errors.length > 0 ? `E${this.errors.length}` : 'E0';
-                
+
                 const baseKey = `${pattern.type}:${position}:${silentContext}:${errorContext}`;
 
                 if (ruleName) {
@@ -1325,7 +1340,7 @@
 
                 switch (pattern.type) {
                     case 'token':
-                        return `${baseKey}:${pattern.name}`;
+                        return `${baseKey}:${pattern.name}:${pattern.value || ''}`;
                     case 'optional':
                         return `${baseKey}:optional`;
                     case 'repeat':

@@ -55,7 +55,7 @@ declare class Result {
     isChoice(): boolean;
     isRepeat(): boolean;
     isSequence(): boolean;
-    isCustom(): boolean;
+    isCustom(tag?: string): boolean;
     getTokenKind(): string | undefined;
     getTokenValue(): string | null | undefined;
     getTokenSpan(): Span | undefined;
@@ -169,6 +169,7 @@ interface Span {
 interface Pattern {
     type: 'token' | 'rule' | 'repeat' | 'choice' | 'seq' | 'optional';
     silent: boolean;
+    value?: string;
     name?: string;
     min?: number;
     max?: number;
@@ -292,15 +293,15 @@ declare namespace Types {
 
 declare function parse(tokens: Token[], rules: Rules, settings?: ParserSettings): ParseResult;
 declare const createRule: (name: string, pattern: Pattern, options?: Rule["options"]) => Rule;
-declare function token(name: string, silent?: boolean): Pattern;
-declare function optional(pattern: Pattern, silent?: boolean): Pattern;
+declare function token(name: string, value?: string): Pattern;
+declare function optional(pattern: Pattern): Pattern;
 declare function choice(...patterns: Pattern[]): Pattern;
-declare function repeat(pattern: Pattern, min?: number, max?: number, separator?: Pattern, silent?: boolean): Pattern;
-declare function oneOrMore(pattern: Pattern, separator?: Pattern, silent?: boolean): Pattern;
-declare function zeroOrMore(pattern: Pattern, separator?: Pattern, silent?: boolean): Pattern;
-declare function zeroOrOne(pattern: Pattern, separator?: Pattern, silent?: boolean): Pattern;
+declare function repeat(pattern: Pattern, min?: number, max?: number, separator?: Pattern): Pattern;
+declare function oneOrMore(pattern: Pattern, separator?: Pattern): Pattern;
+declare function zeroOrMore(pattern: Pattern, separator?: Pattern): Pattern;
+declare function zeroOrOne(pattern: Pattern, separator?: Pattern): Pattern;
 declare function seq(...patterns: Pattern[]): Pattern;
-declare function rule(name: string, silent?: boolean): Pattern;
+declare function rule(name: string): Pattern;
 declare function silent<T extends Pattern>(pattern: T): T;
 declare function loud<T extends Pattern>(pattern: T): T;
 declare function error(cond: ErrorHandler['cond'], msg: string, code?: string): ErrorHandler;

@@ -223,8 +223,14 @@
                 return this.mode === 'seq';
             }
 
-            isCustom() : boolean {
-                return this.mode === 'custom';
+            isCustom(tag?: string) : boolean {
+                if(this.mode === 'custom') {
+                    if(tag) {
+                        return (this.source as CustomSource).tag == tag;
+                    } else return true;
+                }
+
+                return false;
             }
 
         // └────────────────────────────────────────────────────────────────────┘

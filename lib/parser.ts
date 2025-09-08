@@ -34,7 +34,7 @@
         }
 
         export const createRule = ( name: string, pattern: Types.Pattern, options: Types.Rule['options'] = {} ): Types.Rule => {
-            const finalOptions = { name, silent: false, ...options, };
+            const finalOptions = { name: false, ...options, };
             return { name, pattern: pattern, options: finalOptions, };
         };
 
@@ -43,18 +43,18 @@
 
     // ┌──────────────────────────────── CTRL ──────────────────────────────┐
 
-        export function token(name: string, silent = false): Types.Pattern {
+        export function token(name: string, value?: string): Types.Pattern {
             if (!name || typeof name !== 'string') {
                 throw new Error('Token name must be a non-empty string');
             }
-            return { type: 'token', name, silent };
+            return { type: 'token', name, value, silent: false };
         }
 
-        export function optional(pattern: Types.Pattern, silent = false): Types.Pattern {
+        export function optional(pattern: Types.Pattern): Types.Pattern {
             if (!pattern || typeof pattern !== 'object') {
                 throw new Error('Optional pattern must be a valid pattern');
             }
-            return { type: 'optional', pattern, silent };
+            return { type: 'optional', pattern, silent: false };
         }
 
         export function choice(...patterns: Types.Pattern[]): Types.Pattern {
@@ -64,26 +64,26 @@
             return { type: 'choice', patterns, silent: false };
         }
 
-        export function repeat(pattern: Types.Pattern, min = 0, max = Infinity, separator?: Types.Pattern, silent = false): Types.Pattern {
+        export function repeat(pattern: Types.Pattern, min = 0, max = Infinity, separator?: Types.Pattern): Types.Pattern {
             if (min < 0) {
                 throw new Error('Minimum repetition count cannot be negative');
             }
             if (max < min) {
                 throw new Error('Maximum repetition count cannot be less than minimum');
             }
-            return { type: 'repeat', pattern, min, max, separator, silent };
+            return { type: 'repeat', pattern, min, max, separator, silent: false };
         }
 
-        export function oneOrMore(pattern: Types.Pattern, separator?: Types.Pattern, silent = false): Types.Pattern {
-            return repeat(pattern, 1, Infinity, separator, silent);
+        export function oneOrMore(pattern: Types.Pattern, separator?: Types.Pattern): Types.Pattern {
+            return repeat(pattern, 1, Infinity, separator);
         }
 
-        export function zeroOrMore(pattern: Types.Pattern, separator?: Types.Pattern, silent = false): Types.Pattern {
-            return repeat(pattern, 0, Infinity, separator, silent);
+        export function zeroOrMore(pattern: Types.Pattern, separator?: Types.Pattern): Types.Pattern {
+            return repeat(pattern, 0, Infinity, separator);
         }
 
-        export function zeroOrOne(pattern: Types.Pattern, separator?: Types.Pattern, silent = true): Types.Pattern {
-            return repeat(pattern, 0, 1, separator, silent);
+        export function zeroOrOne(pattern: Types.Pattern, separator?: Types.Pattern): Types.Pattern {
+            return silent(repeat(pattern, 0, 1, separator));
         }
 
         export function seq(...patterns: Types.Pattern[]): Types.Pattern {
@@ -93,11 +93,11 @@
             return { type: 'seq', patterns, silent: false };
         }
 
-        export function rule(name: string, silent = false): Types.Pattern {
+        export function rule(name: string): Types.Pattern {
             if (!name || typeof name !== 'string') {
                 throw new Error('Rule name must be a non-empty string');
             }
-            return { type: 'rule', name, silent };
+            return { type: 'rule', name, silent: false };
         }
 
         export function silent<T extends Types.Pattern>(pattern: T): T {
