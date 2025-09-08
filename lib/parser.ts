@@ -1,5 +1,4 @@
-// parser.ts — Advanced syntax analyzer that converts tokens
-//             into AST with customizable grammar rules and intelligent error detection.
+// parser.ts — A mechanism for creating grammatical rules..!
 //
 // repo   : https://github.com/je-es/parser
 // author : https://github.com/maysara-elshewehy

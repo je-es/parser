@@ -1,14 +1,8 @@
 {
 	"name": "@je-es/parser",
 	"version": "0.0.9",
-	"description": "Advanced syntax analyzer that converts tokens into AST with customizable grammar rules and intelligent error detection.",
-	"keywords": [
-		"je-es",
-		"syntax",
-		"parser",
-		"lint",
-		"tool"
-	],
+	"description": "A mechanism for creating grammatical rules..!",
+	"keywords": [ "je-es", "parser", "tool", "convert", "tokens", "ast" ],
 	"license": "MIT",
 	"main": "./dist/parser.js",
 	"module": "./dist/parser.mjs",
