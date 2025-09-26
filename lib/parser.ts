@@ -1,4 +1,4 @@
-// parser.ts — A mechanism for creating grammatical rules..!
+// parser.ts — A mechanism for creating grammatical rules.
 //
 // repo   : https://github.com/je-es/parser
 // author : https://github.com/maysara-elshewehy
@@ -9,11 +9,27 @@
 
 // ╔════════════════════════════════════════ PACK ════════════════════════════════════════╗
 
-    import * as Types from './types';
-    export * as Types from './types';
+    import * as Types           from './types';
+    import * as core            from './core';
 
-    import * as core from './core';
-    export { Parser } from './core';
+    export { Parser }           from './core';
+    export { Result }           from './result';
+    export type {
+        Span,
+        Token,
+        MiniToken,
+        Pattern,
+        Rule,
+        Rules,
+        ErrorHandler,
+        RecoveryStrategy,
+        BuildFunction,
+        ParseResult,
+        ParserSettings,
+        ParseError,
+        DebugLevel,
+    }                           from './types';
+    export { ERRORS }           from './types';
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
 

@@ -29,6 +29,7 @@
             public errors                   : Types.ParseError[] = [];
             public index                    : number = 0;
             public depth                    : number = 0;
+            private rootStartIndex          : number = 0;
 
             // Debug & stats
             private debugLevel              : Types.DebugLevel;
@@ -122,6 +123,7 @@
 
                 while (this.index < this.tokens.length && (maxErrors === 0 || this.errors.length < maxErrors)) {
                     const beforeIndex = this.index;
+                    this.rootStartIndex = beforeIndex; // Set root start index
 
                     try {
                         const result = this.parsePattern(startRule.pattern, startRule);
@@ -205,7 +207,7 @@
                 this.log('patterns', `${'  '.repeat(this.indentLevel)}⚡ ${pattern.type}${parentRule ? ` (${parentRule.name})` : ''}${shouldBeSilent ? ' [SILENT]' : ''} @${this.index}`);
                 this.depth++;
 
-                let result = Result.create();
+                let result = Result.create('unset', null, 'unset', this.getCurrentSpan());
 
                 try {
                     this.skipIgnored(parentRule?.options?.ignored);
@@ -228,7 +230,7 @@
 
                         this.log('patterns', `${'  '.repeat(this.indentLevel)}✗ ${pattern.type} (optional context, suppressed) → ${startIndex}`);
 
-                        return Result.createAsOptional('failed', undefined, this.getCurrentSpan());
+                        return Result.createAsOptional('failed', null, this.getCurrentSpan());
                     }
                     throw error;
                 } finally {
@@ -265,7 +267,7 @@
                 if (this.index >= this.tokens.length) {
                     this.log('tokens', `✗ Expected '${tokenName}', got 'EOF' @${this.index}`);
 
-                    if (shouldBeSilent) { return Result.create('failed', undefined, undefined, this.getCurrentSpan()); }
+                    if (shouldBeSilent) { return Result.create('failed', null, 'unset', this.getCurrentSpan()); }
 
                     const error = this.createError(
                         Types.ERRORS.TOKEN_EXPECTED_EOF,
@@ -277,7 +279,7 @@
                         this.getInnerMostRule()
                     );
                     const finalError = this.getCustomErrorOr(parentRule, error);
-                    return Result.createAsToken('failed').withError(finalError);
+                    return Result.createAsToken('failed', null, this.getCurrentSpan()).withError(finalError);
                 }
 
                 const token = this.getCurrentToken();
@@ -306,7 +308,7 @@
 
                 this.log('tokens', `✗ Expected '${tokenName}', got '${token.kind}' @${this.lastVisitedIndex}`);
 
-                if (shouldBeSilent) { return Result.create('failed', undefined, undefined, token.span); }
+                if (shouldBeSilent) { return Result.create('failed', null, 'unset', token.span); }
 
                 const error = this.createError(
                     Types.ERRORS.TOKEN_MISMATCH,
@@ -335,7 +337,7 @@
                     this.patternStack.pop();
                     const error = new Error(`Rule '${ruleName}' not found`);
                     this.handleFatalError(error);
-                    return Result.create('failed', undefined, undefined, this.getCurrentSpan()).withError(this.fetalErrorToParseError(error));
+                    return Result.create('failed', null, 'unset', this.getCurrentSpan()).withError(this.fetalErrorToParseError(error));
                 }
 
                 const startIndex = this.index;
@@ -354,7 +356,7 @@
                             this.log('rules', `✗ ${ruleName} (silent) @${this.lastVisitedIndex}`);
                             this.ruleStack.pop();
                             this.patternStack.pop();
-                            return Result.create('failed', undefined, undefined, result.span);
+                            return Result.create('failed', null, 'unset', result.span);
                         }
 
                         const error = this.createError(
@@ -370,7 +372,7 @@
                         this.ruleStack.pop();
                         this.patternStack.pop();
                         const finalError = this.getCustomErrorOr(parentRule, error);
-                        return Result.create('failed', undefined, undefined, result.span).withError(finalError);
+                        return Result.create('failed', null, 'unset', result.span).withError(finalError);
                     }
 
                     let finalResult = result;
@@ -401,7 +403,7 @@
                     if (shouldBeSilent) {
                         this.index = startIndex;
                         this.errors = savedErrors;
-                        return Result.create('failed', undefined, undefined, this.getCurrentSpan());
+                        return Result.create('failed', null, 'unset', this.getCurrentSpan());
                     }
 
                     if (e instanceof Error) {
@@ -411,7 +413,7 @@
                     }
                 }
 
-                return Result.create('failed', undefined, undefined, this.getCurrentSpan());
+                return Result.create('failed', null, 'unset', this.getCurrentSpan());
             }
 
             private parseOptional(pattern: Types.Pattern, parentRule?: Types.Rule): Result {
@@ -440,7 +442,7 @@
 
                         this.log('verbose', `✓ OPTIONAL → [] (pattern returned null) @${this.index}`);
 
-                        return Result.createAsOptional('passed', undefined, result.span ?? this.getCurrentSpan());
+                        return Result.createAsOptional('passed', null, result.span ?? this.getCurrentSpan());
                     }
                 } catch (e) {
                     this.index  = startIndex;
@@ -448,7 +450,7 @@
 
                     this.log('verbose', `✓ OPTIONAL → [] (exception caught: ${(e as Types.ParseError).msg || e}) @${this.index}`);
 
-                    return Result.createAsOptional('passed', undefined, this.getCurrentSpan());
+                    return Result.createAsOptional('passed', null, this.getCurrentSpan());
                 }
             }
 
@@ -476,7 +478,7 @@
                         const result = this.parsePattern(patterns[patternIndex], parentRule);
                         if (result.isFullyPassed()) {
                             this.log('verbose', `✓ CHOICE → alt ${patternIndex + 1}/${patterns.length} succeeded @${this.lastVisitedIndex}`);
-                            return Result.createAsChoice('passed', result, patternIndex);
+                            return Result.createAsChoice('passed', result, patternIndex, result.span);
                         }
 
                         const progress = this.lastVisitedIndex - startIndex;
@@ -517,7 +519,7 @@
                 this.index = startIndex;
                 this.errors = savedErrors;
 
-                if (shouldBeSilent) { return Result.create('failed', undefined, undefined, this.getCurrentSpan()); }
+                if (shouldBeSilent) { return Result.create('failed', null, 'unset', this.getCurrentSpan()); }
 
                 if (bestResult) {
                     const bestError = bestResult.errors.length > 0
@@ -637,7 +639,7 @@
 
                 // Check minimum requirement and create appropriate error
                 if (results.length < min) {
-                    if (shouldBeSilent) { return Result.create('failed', undefined, undefined, this.getCurrentSpan()); }
+                    if (shouldBeSilent) { return Result.create('failed', null, 'unset', this.getCurrentSpan()); }
 
                     // Check if we should use a custom error from the parent rule
                     if (parentRule?.options?.errors) {
@@ -671,7 +673,7 @@
                 this.log('verbose', `SEQUENCE[${patterns.length}] @${this.index}`);
                 this.lastVisitedIndex = this.index;
 
-                if (patterns.length === 0) { return Result.create('failed', undefined, undefined, this.getCurrentSpan()); }
+                if (patterns.length === 0) { return Result.create('failed', null, 'unset', this.getCurrentSpan()); }
 
                 const startIndex  = this.index;
                 const savedErrors = [...this.errors];
@@ -690,7 +692,7 @@
                             if (shouldBeSilent) {
                                 this.index  = startIndex;
                                 this.errors = savedErrors;
-                                return Result.create('failed', undefined, undefined, result.span);
+                                return Result.create('failed', null, 'unset', result.span);
                             }
 
                             const error = this.createError(
@@ -733,28 +735,45 @@
                         }
                     }
 
-                    return Result.create('failed', undefined, undefined, this.getCurrentSpan());
+                    return Result.create('failed', null, 'unset', this.getCurrentSpan());
                 }
             }
 
             private safeBuild(buildFn: Types.BuildFunction, matches: Result): Result {
                 try {
-                    return buildFn(matches);
+                    // To fix -88 result span issue
+                    const tempRes = buildFn(matches);
+
+                    if(tempRes.span && (tempRes.span.start === -88 || tempRes.span.end === -88)) {
+                        console.warn(`⚠️ -88 result span issue: ${JSON.stringify(tempRes, null, 2)}`);
+                    }
+
+                    return tempRes;
                 } catch (error) {
+                    // log if fetal error like : Cannot set properties of undefined (reading/setting 'xxx'), ..
+                    if(error instanceof TypeError || error instanceof ReferenceError) {
+                        console.error(`Build function error in rule '${this.lastHandledRule}':`, error);
+                    }
+
                     if (!this.isInSilentMode()) {
+                        const isParseError = (error as Types.ParseError).span !== undefined;
                         const buildError = this.createError(
-                            Types.ERRORS.BUILD_FUNCTION_FAILED,
-                            `${(error as Error).message}`,
-                            Parser.hanldeErrorSpan(this.getCurrentSpan()),
-                            0,
-                            this.lastVisitedIndex,
-                            this.lastHandledRule!
+                            isParseError ? (error as Types.ParseError).code : Types.ERRORS.BUILD_FUNCTION_FAILED,
+                            isParseError ? (error as Types.ParseError).msg : `${(error as Error).message}`,
+                            isParseError ? (error as Types.ParseError).span : Parser.hanldeErrorSpan(this.getCurrentSpan()),
+                            isParseError ? (error as Types.ParseError).failedAt : 0,
+                            isParseError ? (error as Types.ParseError).tokenIndex : this.lastVisitedIndex,
+                            isParseError ? (error as Types.ParseError).prevRule : this.lastHandledRule!,
+                            isParseError ? (error as Types.ParseError).prevInnerRule : this.getInnerMostRule(),
                         );
                         this.addError(buildError);
                         this.log('errors', `Build error: ${(error as Error).message}`);
                     }
 
                     // default to returning first match if build fails
+                    // matches.status = 'failed';
+                    // لو خلّيناها failed,
+                    // ده هيتسبب في منع إكتشاف ما أسميه بالـ Magnetic bubbles !
                     return matches;
                 }
             }
@@ -894,6 +913,7 @@
                 this.depth = 0;
                 this.errorSeq = 0;
                 this.indentLevel = 0;
+                this.rootStartIndex = 0;
                 this.silentContextStack = [];
 
                 // Reset enhanced rule tracking
@@ -1029,6 +1049,7 @@
                     span: span || this.getCurrentSpan(),
                     failedAt,
                     tokenIndex,
+                    startIndex: this.rootStartIndex,  // Use root start index for error tracking
                     prevRule,
                     prevInnerRule: prevInnerRule || this.getInnerMostRule()
                 };
@@ -1115,6 +1136,10 @@
                     rule.length < 30;
             }
 
+            private isSpanCovered(inner: Types.Span, outer: Types.Span): boolean {
+                return outer.start <= inner.start && outer.end >= inner.end;
+            }
+
             private addError(error: Types.ParseError): void {
                 if (this.isInSilentMode()) {return;}
 
@@ -1123,8 +1148,54 @@
 
                 if (this.settings.errorRecovery!.mode === 'strict' && this.errors.length > 0) {return;}
 
+                // Normalize error message by removing different quote styles
+                const normalizeMsg = (msg: string) =>
+                    msg.replace(/[`'"]/g, '').toLowerCase();
+
+                // Check for duplicate errors with same code and normalized message
+                const duplicateError = this.errors.find(e =>
+                    e.code === error.code &&
+                    normalizeMsg(e.msg) === normalizeMsg(error.msg)
+                );
+
+                if (duplicateError) {
+                    // If we find a duplicate, always keep the first error (with earlier span)
+                    if (error.span && duplicateError.span) {
+                        // Keep the earlier error by discarding the new one
+                        return;
+                    }
+                }                if (error.span) {
+                    // First check for exact span matches (keeping older ones)
+                    const hasExactSpanMatch = this.errors.some(e =>
+                        e.span && error.span &&
+                        e.span.start === error.span.start &&
+                        e.span.end === error.span.end
+                    );
+
+                    if (hasExactSpanMatch) {
+                        return;
+                    }
+
+                    // Then check if this error's span is covered by any existing error
+                    const isErrorCovered = this.errors.some(e =>
+                        e.span && error.span &&
+                        this.isSpanCovered(error.span, e.span)
+                    );
+
+                    if (isErrorCovered) {
+                        return;
+                    }
+
+                    // Finally, remove any errors whose spans are covered by this error
+                    this.errors = this.errors.filter(e =>
+                        !e.span || !error.span ||
+                        !this.isSpanCovered(e.span, error.span)
+                    );
+                }
+
+                // Add the error and log it
                 this.errors.push(error);
-                this.log('errors', `⚠️  ${error.msg} @${error.span.start}:${error.span.end}`);
+                this.log('errors', `⚠️  ${error.msg} @${error.span?.start}:${error.span?.end}`);
             }
 
             private handleParseError(error: Types.ParseError, rule?: Types.Rule): never {

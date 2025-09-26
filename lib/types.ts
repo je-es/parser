@@ -8,8 +8,8 @@
 
     import { Parser } from './core';
     import { Result } from './result';
-    export { Parser } from './core';
-    export { Result } from './result';
+    
+    export { Result };
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
 
@@ -92,6 +92,7 @@
         span            : Span;
         failedAt        : number;
         tokenIndex      : number;
+        startIndex      : number;      // The index where the pattern started processing before encountering the error
         prevRule        : string;
         prevInnerRule?  : string;
     }

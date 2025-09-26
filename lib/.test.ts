@@ -70,6 +70,7 @@
                     span: { start: 0, end: 1 },
                     failedAt: 0,
                     tokenIndex: 0,
+                    startIndex: 0,
                     prevRule: "unknown",
                     prevInnerRule: "unknown",
                 }]);
@@ -91,6 +92,7 @@
                         span: { start: 0, end: 1 },
                         failedAt: 0,
                         tokenIndex: 0,
+                        startIndex: 0,
                         prevRule: "unknown",
                         prevInnerRule: "unknown",
                     },
@@ -121,6 +123,7 @@
                         span: { start: 0, end: 5 },
                         failedAt: 0,
                         tokenIndex: 0,
+                        startIndex: 0,
                         prevRule: "myToken",
                         prevInnerRule: "unknown",
                     },
@@ -131,6 +134,7 @@
                         span: { start: 5, end: 6 },
                         failedAt: 0,
                         tokenIndex: 1,
+                        startIndex: 1,
                         prevRule: "myToken",
                         prevInnerRule: "unknown",
                     }
@@ -219,8 +223,8 @@
                             // here, we try to return the value itself directly
                             // without the `OptionalSource` as its parent/wrapper.
 
-                            const srcData = data.getOptionalResult()!.getTokenData();
-                            return Types.Result.createAsToken('passed', srcData);
+                            const srcData = data.getOptionalResult()!.getTokenData()!;
+                            return Types.Result.createAsToken('passed', srcData, srcData.span);
                         }
                     }
                 ),
@@ -268,6 +272,7 @@
                         span                : { start: 0, end: 5 },
                         failedAt            : 0,
                         tokenIndex          : 0,
+                        startIndex          : 0,
                         prevRule            : "myToken",
                         prevInnerRule       : "unknown",
                     }
@@ -338,6 +343,7 @@
                     span                : { start: 0, end: 1 },
                     failedAt            : 0,
                     tokenIndex          : 0,
+                    startIndex          : 0,
                     prevRule            : "myToken",
                     prevInnerRule       : "unknown",
                 }]);
@@ -408,6 +414,7 @@
                     span                : { start: 0, end: 5 },
                     failedAt            : 0,
                     tokenIndex          : 1,
+                    startIndex          : 0,
                     prevRule            : "myToken",
                     prevInnerRule       : "unknown",
                 }]);
@@ -486,6 +493,7 @@
                     span                : { start: 0, end: 5 },
                     failedAt            : 0,
                     tokenIndex          : 0,
+                    startIndex          : 0,
                     prevRule            : "myToken",
                     prevInnerRule       : "unknown",
                 }]);

@@ -37,8 +37,9 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // lib/parser.ts
 var parser_exports = {};
 __export(parser_exports, {
+  ERRORS: () => ERRORS,
   Parser: () => Parser,
-  Types: () => types_exports,
+  Result: () => Result,
   choice: () => choice,
   createRule: () => createRule,
   error: () => error,
@@ -57,14 +58,6 @@ __export(parser_exports, {
 });
 module.exports = __toCommonJS(parser_exports);
 
-// lib/types.ts
-var types_exports = {};
-__export(types_exports, {
-  ERRORS: () => ERRORS,
-  Parser: () => Parser,
-  Result: () => Result
-});
-
 // lib/result.ts
 var Result = class _Result {
   // Initialization
@@ -76,17 +69,17 @@ var Result = class _Result {
     this.source = null;
     this.mode = "unset";
     this.errors = [];
-    this.status = status != null ? status : "unset";
-    this.source = source != null ? source : null;
-    this.mode = mode != null ? mode : "unset";
-    this.span = span != null ? span : { start: -88, end: -88 };
+    this.status = status;
+    this.source = source;
+    this.mode = mode;
+    this.span = span;
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌──────────────────────────────── MAIN ──────────────────────────────┐
   // └────────────────────────────────────────────────────────────────────┘
   // ┌─────────────────────────────── FACTORY ────────────────────────────┐
   clone() {
-    const res = new _Result(this.status, this.source, this.mode);
+    const res = new _Result(this.status, this.source, this.mode, this.span);
     res.errors = [...this.errors];
     return res;
   }
@@ -94,55 +87,49 @@ var Result = class _Result {
     return new _Result(status, source, mode, span);
   }
   static createAsToken(status, source, span) {
-    var _a, _b, _c;
+    var _a, _b;
     const newSource = {
       source_kind: "token-source",
-      kind: (_a = source == null ? void 0 : source.kind) != null ? _a : "unknown-token",
+      kind: (_a = source == null ? void 0 : source.kind) != null ? _a : "unset",
       value: (_b = source == null ? void 0 : source.value) != null ? _b : void 0,
-      span: (_c = source == null ? void 0 : source.span) != null ? _c : void 0
+      span
     };
-    return _Result.create(status, newSource, "token", span != null ? span : newSource.span);
+    return _Result.create(status, newSource, "token", span);
   }
   static createAsOptional(status, source, span) {
     const newSource = {
       source_kind: "optional-source",
-      result: source != null ? source : null
+      result: source
     };
-    return _Result.create(status, newSource, "optional", span != null ? span : source == null ? void 0 : source.span);
+    return _Result.create(status, newSource, "optional", span);
   }
   static createAsChoice(status, source, index, span) {
     const newSource = {
       source_kind: "choice-source",
-      atIndex: index != null ? index : -1,
-      result: source != null ? source : null
+      atIndex: index,
+      result: source
     };
-    return _Result.create(status, newSource, "choice", span != null ? span : source == null ? void 0 : source.span);
+    return _Result.create(status, newSource, "choice", span);
   }
   static createAsRepeat(status, source, span) {
     const newSource = {
       source_kind: "repeat-source",
       result: source != null ? source : []
     };
-    const full_span = { start: -9, end: -9 };
-    full_span.start = source && source.length ? source[0].span.start : -8;
-    full_span.end = source && source.length ? source[source.length - 1].span.end : -7;
-    return _Result.create(status, newSource, "repeat", span != null ? span : full_span);
+    return _Result.create(status, newSource, "repeat", span);
   }
   static createAsSequence(status, source, span) {
     const newSource = {
       source_kind: "sequence-source",
       result: source != null ? source : []
     };
-    const full_span = { start: -6, end: -6 };
-    full_span.start = source && source.length ? source[0].span.start : -5;
-    full_span.end = source && source.length ? source[source.length - 1].span.end : -4;
-    return _Result.create(status, newSource, "seq", span != null ? span : full_span);
+    return _Result.create(status, newSource, "seq", span);
   }
   static createAsCustom(status, name, data, span) {
     const newSource = {
       source_kind: "custom-source",
-      tag: name != null ? name : "",
-      data: data != null ? data : null
+      tag: name,
+      data
     };
     return _Result.create(status, newSource, "custom", span);
   }
@@ -281,6 +268,26 @@ var Result = class _Result {
   // └────────────────────────────────────────────────────────────────────┘
 };
 
+// lib/types.ts
+var ERRORS = {
+  // Core parsing errors
+  LEXICAL_ERROR: "LEXICAL_ERROR",
+  TOKEN_EXPECTED_EOF: "TOKEN_EXPECTED_EOF",
+  TOKEN_MISMATCH: "TOKEN_MISMATCH",
+  RULE_FAILED: "RULE_FAILED",
+  BUILD_FUNCTION_FAILED: "BUILD_FUNCTION_FAILED",
+  REPEAT_MIN_NOT_MET: "REPEAT_MIN_NOT_MET",
+  SEQUENCE_FAILED: "SEQUENCE_FAILED",
+  CUSTOM_ERROR: "CUSTOM_ERROR",
+  // Choice and alternatives
+  CHOICE_ALL_FAILED: "CHOICE_ALL_FAILED",
+  // System errors
+  FATAL_ERROR: "FATAL_ERROR",
+  UNKNOWN_ERROR: "UNKNOWN_ERROR",
+  // Recovery and validation
+  RECOVERY_CUSTOM: "RECOVERY_CUSTOM"
+};
+
 // lib/core.ts
 var Parser = class _Parser {
   // Initialization
@@ -291,6 +298,7 @@ var Parser = class _Parser {
     this.errors = [];
     this.index = 0;
     this.depth = 0;
+    this.rootStartIndex = 0;
     this.indentLevel = 0;
     this.startTime = 0;
     this.errorSeq = 0;
@@ -362,6 +370,7 @@ var Parser = class _Parser {
     let consecutiveErrors = 0;
     while (this.index < this.tokens.length && (maxErrors === 0 || this.errors.length < maxErrors)) {
       const beforeIndex = this.index;
+      this.rootStartIndex = beforeIndex;
       try {
         const result = this.parsePattern(startRule.pattern, startRule);
         if (result.status === "passed") {
@@ -416,7 +425,7 @@ var Parser = class _Parser {
     this.indentLevel++;
     this.log("patterns", `${"  ".repeat(this.indentLevel)}\u26A1 ${pattern.type}${parentRule ? ` (${parentRule.name})` : ""}${shouldBeSilent ? " [SILENT]" : ""} @${this.index}`);
     this.depth++;
-    let result = Result.create();
+    let result = Result.create("unset", null, "unset", this.getCurrentSpan());
     try {
       this.skipIgnored((_a = parentRule == null ? void 0 : parentRule.options) == null ? void 0 : _a.ignored);
       result = this.executePattern(pattern, parentRule, shouldBeSilent);
@@ -430,7 +439,7 @@ var Parser = class _Parser {
       if (isOptionalContext) {
         this.index = startIndex;
         this.log("patterns", `${"  ".repeat(this.indentLevel)}\u2717 ${pattern.type} (optional context, suppressed) \u2192 ${startIndex}`);
-        return Result.createAsOptional("failed", void 0, this.getCurrentSpan());
+        return Result.createAsOptional("failed", null, this.getCurrentSpan());
       }
       throw error2;
     } finally {
@@ -464,7 +473,7 @@ var Parser = class _Parser {
     if (this.index >= this.tokens.length) {
       this.log("tokens", `\u2717 Expected '${tokenName}', got 'EOF' @${this.index}`);
       if (shouldBeSilent) {
-        return Result.create("failed", void 0, void 0, this.getCurrentSpan());
+        return Result.create("failed", null, "unset", this.getCurrentSpan());
       }
       const error3 = this.createError(
         ERRORS.TOKEN_EXPECTED_EOF,
@@ -476,7 +485,7 @@ var Parser = class _Parser {
         this.getInnerMostRule()
       );
       const finalError = this.getCustomErrorOr(parentRule, error3);
-      return Result.createAsToken("failed").withError(finalError);
+      return Result.createAsToken("failed", null, this.getCurrentSpan()).withError(finalError);
     }
     const token2 = this.getCurrentToken();
     if (token2.kind === tokenName) {
@@ -501,7 +510,7 @@ var Parser = class _Parser {
     }
     this.log("tokens", `\u2717 Expected '${tokenName}', got '${token2.kind}' @${this.lastVisitedIndex}`);
     if (shouldBeSilent) {
-      return Result.create("failed", void 0, void 0, token2.span);
+      return Result.create("failed", null, "unset", token2.span);
     }
     const error2 = this.createError(
       ERRORS.TOKEN_MISMATCH,
@@ -528,7 +537,7 @@ var Parser = class _Parser {
       this.patternStack.pop();
       const error2 = new Error(`Rule '${ruleName}' not found`);
       this.handleFatalError(error2);
-      return Result.create("failed", void 0, void 0, this.getCurrentSpan()).withError(this.fetalErrorToParseError(error2));
+      return Result.create("failed", null, "unset", this.getCurrentSpan()).withError(this.fetalErrorToParseError(error2));
     }
     const startIndex = this.index;
     const savedErrors = [...this.errors];
@@ -542,7 +551,7 @@ var Parser = class _Parser {
           this.log("rules", `\u2717 ${ruleName} (silent) @${this.lastVisitedIndex}`);
           this.ruleStack.pop();
           this.patternStack.pop();
-          return Result.create("failed", void 0, void 0, result.span);
+          return Result.create("failed", null, "unset", result.span);
         }
         const error2 = this.createError(
           ERRORS.RULE_FAILED,
@@ -556,7 +565,7 @@ var Parser = class _Parser {
         this.ruleStack.pop();
         this.patternStack.pop();
         const finalError = this.getCustomErrorOr(parentRule, error2);
-        return Result.create("failed", void 0, void 0, result.span).withError(finalError);
+        return Result.create("failed", null, "unset", result.span).withError(finalError);
       }
       let finalResult = result;
       if (result !== null && ((_a = targetRule.options) == null ? void 0 : _a.build)) {
@@ -581,7 +590,7 @@ var Parser = class _Parser {
       if (shouldBeSilent) {
         this.index = startIndex;
         this.errors = savedErrors;
-        return Result.create("failed", void 0, void 0, this.getCurrentSpan());
+        return Result.create("failed", null, "unset", this.getCurrentSpan());
       }
       if (e instanceof Error) {
         this.handleFatalError(e);
@@ -589,7 +598,7 @@ var Parser = class _Parser {
         this.handleParseError(e, parentRule);
       }
     }
-    return Result.create("failed", void 0, void 0, this.getCurrentSpan());
+    return Result.create("failed", null, "unset", this.getCurrentSpan());
   }
   parseOptional(pattern, parentRule) {
     var _a;
@@ -607,13 +616,13 @@ var Parser = class _Parser {
         this.index = startIndex;
         this.errors = savedErrors;
         this.log("verbose", `\u2713 OPTIONAL \u2192 [] (pattern returned null) @${this.index}`);
-        return Result.createAsOptional("passed", void 0, (_a = result.span) != null ? _a : this.getCurrentSpan());
+        return Result.createAsOptional("passed", null, (_a = result.span) != null ? _a : this.getCurrentSpan());
       }
     } catch (e) {
       this.index = startIndex;
       this.errors = savedErrors;
       this.log("verbose", `\u2713 OPTIONAL \u2192 [] (exception caught: ${e.msg || e}) @${this.index}`);
-      return Result.createAsOptional("passed", void 0, this.getCurrentSpan());
+      return Result.createAsOptional("passed", null, this.getCurrentSpan());
     }
   }
   parseChoice(patterns, parentRule, shouldBeSilent) {
@@ -629,7 +638,7 @@ var Parser = class _Parser {
         const result = this.parsePattern(patterns[patternIndex], parentRule);
         if (result.isFullyPassed()) {
           this.log("verbose", `\u2713 CHOICE \u2192 alt ${patternIndex + 1}/${patterns.length} succeeded @${this.lastVisitedIndex}`);
-          return Result.createAsChoice("passed", result, patternIndex);
+          return Result.createAsChoice("passed", result, patternIndex, result.span);
         }
         const progress = this.lastVisitedIndex - startIndex;
         const currentErrors = this.errors.slice(savedErrors.length);
@@ -663,7 +672,7 @@ var Parser = class _Parser {
     this.index = startIndex;
     this.errors = savedErrors;
     if (shouldBeSilent) {
-      return Result.create("failed", void 0, void 0, this.getCurrentSpan());
+      return Result.create("failed", null, "unset", this.getCurrentSpan());
     }
     if (bestResult) {
       const bestError = bestResult.errors.length > 0 ? bestResult.errors[bestResult.errors.length - 1] : this.createError(
@@ -756,7 +765,7 @@ var Parser = class _Parser {
     }
     if (results.length < min) {
       if (shouldBeSilent) {
-        return Result.create("failed", void 0, void 0, this.getCurrentSpan());
+        return Result.create("failed", null, "unset", this.getCurrentSpan());
       }
       if ((_b = parentRule == null ? void 0 : parentRule.options) == null ? void 0 : _b.errors) {
         const customError = this.getCustomErrorForCondition(parentRule, 0, this.index, startIndex);
@@ -785,7 +794,7 @@ var Parser = class _Parser {
     this.log("verbose", `SEQUENCE[${patterns.length}] @${this.index}`);
     this.lastVisitedIndex = this.index;
     if (patterns.length === 0) {
-      return Result.create("failed", void 0, void 0, this.getCurrentSpan());
+      return Result.create("failed", null, "unset", this.getCurrentSpan());
     }
     const startIndex = this.index;
     const savedErrors = [...this.errors];
@@ -800,7 +809,7 @@ var Parser = class _Parser {
           if (shouldBeSilent) {
             this.index = startIndex;
             this.errors = savedErrors;
-            return Result.create("failed", void 0, void 0, result.span);
+            return Result.create("failed", null, "unset", result.span);
           }
           const error2 = this.createError(
             ERRORS.SEQUENCE_FAILED,
@@ -834,21 +843,30 @@ var Parser = class _Parser {
           this.handleParseError(error2, parentRule);
         }
       }
-      return Result.create("failed", void 0, void 0, this.getCurrentSpan());
+      return Result.create("failed", null, "unset", this.getCurrentSpan());
     }
   }
   safeBuild(buildFn, matches) {
     try {
-      return buildFn(matches);
+      const tempRes = buildFn(matches);
+      if (tempRes.span && (tempRes.span.start === -88 || tempRes.span.end === -88)) {
+        console.warn(`\u26A0\uFE0F -88 result span issue: ${JSON.stringify(tempRes, null, 2)}`);
+      }
+      return tempRes;
     } catch (error2) {
+      if (error2 instanceof TypeError || error2 instanceof ReferenceError) {
+        console.error(`Build function error in rule '${this.lastHandledRule}':`, error2);
+      }
       if (!this.isInSilentMode()) {
+        const isParseError = error2.span !== void 0;
         const buildError = this.createError(
-          ERRORS.BUILD_FUNCTION_FAILED,
-          `${error2.message}`,
-          _Parser.hanldeErrorSpan(this.getCurrentSpan()),
-          0,
-          this.lastVisitedIndex,
-          this.lastHandledRule
+          isParseError ? error2.code : ERRORS.BUILD_FUNCTION_FAILED,
+          isParseError ? error2.msg : `${error2.message}`,
+          isParseError ? error2.span : _Parser.hanldeErrorSpan(this.getCurrentSpan()),
+          isParseError ? error2.failedAt : 0,
+          isParseError ? error2.tokenIndex : this.lastVisitedIndex,
+          isParseError ? error2.prevRule : this.lastHandledRule,
+          isParseError ? error2.prevInnerRule : this.getInnerMostRule()
         );
         this.addError(buildError);
         this.log("errors", `Build error: ${error2.message}`);
@@ -970,6 +988,7 @@ var Parser = class _Parser {
     this.depth = 0;
     this.errorSeq = 0;
     this.indentLevel = 0;
+    this.rootStartIndex = 0;
     this.silentContextStack = [];
     this.ruleStack = [];
     this.patternStack = [];
@@ -1096,6 +1115,8 @@ var Parser = class _Parser {
       span: span || this.getCurrentSpan(),
       failedAt,
       tokenIndex,
+      startIndex: this.rootStartIndex,
+      // Use root start index for error tracking
       prevRule,
       prevInnerRule: prevInnerRule || this.getInnerMostRule()
     };
@@ -1165,7 +1186,11 @@ var Parser = class _Parser {
   isMeaningfulRule(rule2) {
     return rule2 !== "unknown" && !rule2.includes("<") && !rule2.includes("\u2192") && rule2.length < 30;
   }
+  isSpanCovered(inner, outer) {
+    return outer.start <= inner.start && outer.end >= inner.end;
+  }
   addError(error2) {
+    var _a, _b;
     if (this.isInSilentMode()) {
       return;
     }
@@ -1176,8 +1201,34 @@ var Parser = class _Parser {
     if (this.settings.errorRecovery.mode === "strict" && this.errors.length > 0) {
       return;
     }
+    const normalizeMsg = (msg) => msg.replace(/[`'"]/g, "").toLowerCase();
+    const duplicateError = this.errors.find(
+      (e) => e.code === error2.code && normalizeMsg(e.msg) === normalizeMsg(error2.msg)
+    );
+    if (duplicateError) {
+      if (error2.span && duplicateError.span) {
+        return;
+      }
+    }
+    if (error2.span) {
+      const hasExactSpanMatch = this.errors.some(
+        (e) => e.span && error2.span && e.span.start === error2.span.start && e.span.end === error2.span.end
+      );
+      if (hasExactSpanMatch) {
+        return;
+      }
+      const isErrorCovered = this.errors.some(
+        (e) => e.span && error2.span && this.isSpanCovered(error2.span, e.span)
+      );
+      if (isErrorCovered) {
+        return;
+      }
+      this.errors = this.errors.filter(
+        (e) => !e.span || !error2.span || !this.isSpanCovered(e.span, error2.span)
+      );
+    }
     this.errors.push(error2);
-    this.log("errors", `\u26A0\uFE0F  ${error2.msg} @${error2.span.start}:${error2.span.end}`);
+    this.log("errors", `\u26A0\uFE0F  ${error2.msg} @${(_a = error2.span) == null ? void 0 : _a.start}:${(_b = error2.span) == null ? void 0 : _b.end}`);
   }
   handleParseError(error2, rule2) {
     const finalError = this.getCustomErrorOr(rule2, error2);
@@ -1462,26 +1513,6 @@ var Parser = class _Parser {
   // └────────────────────────────────────────────────────────────────────┘
 };
 
-// lib/types.ts
-var ERRORS = {
-  // Core parsing errors
-  LEXICAL_ERROR: "LEXICAL_ERROR",
-  TOKEN_EXPECTED_EOF: "TOKEN_EXPECTED_EOF",
-  TOKEN_MISMATCH: "TOKEN_MISMATCH",
-  RULE_FAILED: "RULE_FAILED",
-  BUILD_FUNCTION_FAILED: "BUILD_FUNCTION_FAILED",
-  REPEAT_MIN_NOT_MET: "REPEAT_MIN_NOT_MET",
-  SEQUENCE_FAILED: "SEQUENCE_FAILED",
-  CUSTOM_ERROR: "CUSTOM_ERROR",
-  // Choice and alternatives
-  CHOICE_ALL_FAILED: "CHOICE_ALL_FAILED",
-  // System errors
-  FATAL_ERROR: "FATAL_ERROR",
-  UNKNOWN_ERROR: "UNKNOWN_ERROR",
-  // Recovery and validation
-  RECOVERY_CUSTOM: "RECOVERY_CUSTOM"
-};
-
 // lib/parser.ts
 function parse(tokens, rules, settings) {
   const parser = new Parser(rules, settings);
@@ -1559,8 +1590,9 @@ var errorRecoveryStrategies = {
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  ERRORS,
   Parser,
-  Types,
+  Result,
   choice,
   createRule,
   error,

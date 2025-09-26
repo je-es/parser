@@ -35,15 +35,15 @@ declare class Result {
     source: ResultSource;
     mode: ResultMode;
     errors: ParseError[];
-    constructor(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Span);
+    constructor(status: ResultStatus, source: ResultSource | null, mode: ResultMode, span: Span);
     clone(): Result;
-    static create(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Span): Result;
-    static createAsToken(status?: ResultStatus, source?: Token, span?: Span): Result;
-    static createAsOptional(status?: ResultStatus, source?: Result, span?: Span): Result;
-    static createAsChoice(status?: ResultStatus, source?: Result, index?: number, span?: Span): Result;
-    static createAsRepeat(status?: ResultStatus, source?: Result[], span?: Span): Result;
-    static createAsSequence(status?: ResultStatus, source?: Result[], span?: Span): Result;
-    static createAsCustom(status?: ResultStatus, name?: string, data?: unknown, span?: Span): Result;
+    static create(status: ResultStatus, source: ResultSource | null, mode: ResultMode, span: Span): Result;
+    static createAsToken(status: ResultStatus, source: Token | null, span: Span): Result;
+    static createAsOptional(status: ResultStatus, source: Result | null, span: Span): Result;
+    static createAsChoice(status: ResultStatus, source: Result | null, index: number, span: Span): Result;
+    static createAsRepeat(status: ResultStatus, source: Result[] | null, span: Span): Result;
+    static createAsSequence(status: ResultStatus, source: Result[] | null, span: Span): Result;
+    static createAsCustom(status: ResultStatus, name: string, data: unknown, span: Span): Result;
     withError(err: ParseError): Result;
     isPassed(): boolean;
     isFullyPassed(): boolean;
@@ -79,6 +79,7 @@ declare class Parser {
     errors: ParseError[];
     index: number;
     depth: number;
+    private rootStartIndex;
     private debugLevel;
     private indentLevel;
     stats: ParseStatistics;
@@ -131,6 +132,7 @@ declare class Parser {
     private getCustomErrorOr;
     private getInnerMostRule;
     private isMeaningfulRule;
+    private isSpanCovered;
     private addError;
     private handleParseError;
     private handleFatalError;
@@ -212,17 +214,13 @@ interface ParseStatistics {
     errorsRecovered: number;
     parseTimeMs: number;
 }
-interface AstNode {
-    rule: string;
-    span: Span;
-    data?: unknown;
-}
 interface ParseError {
     msg: string;
     code: string;
     span: Span;
     failedAt: number;
     tokenIndex: number;
+    startIndex: number;
     prevRule: string;
     prevInnerRule?: string;
 }
@@ -266,31 +264,6 @@ interface MemoEntry {
     hit?: boolean;
 }
 
-type Types_AstNode = AstNode;
-type Types_BuildFunction = BuildFunction;
-type Types_DebugLevel = DebugLevel;
-declare const Types_ERRORS: typeof ERRORS;
-type Types_ErrorHandler = ErrorHandler;
-type Types_MemoEntry = MemoEntry;
-type Types_MiniToken = MiniToken;
-type Types_ParseError = ParseError;
-type Types_ParseResult = ParseResult;
-type Types_ParseStatistics = ParseStatistics;
-type Types_Parser = Parser;
-declare const Types_Parser: typeof Parser;
-type Types_ParserSettings = ParserSettings;
-type Types_Pattern = Pattern;
-type Types_RecoveryStrategy = RecoveryStrategy;
-type Types_Result = Result;
-declare const Types_Result: typeof Result;
-type Types_Rule = Rule;
-type Types_Rules = Rules;
-type Types_Span = Span;
-type Types_Token = Token;
-declare namespace Types {
-  export { type Types_AstNode as AstNode, type Types_BuildFunction as BuildFunction, type Types_DebugLevel as DebugLevel, Types_ERRORS as ERRORS, type Types_ErrorHandler as ErrorHandler, type Types_MemoEntry as MemoEntry, type Types_MiniToken as MiniToken, type Types_ParseError as ParseError, type Types_ParseResult as ParseResult, type Types_ParseStatistics as ParseStatistics, Types_Parser as Parser, type Types_ParserSettings as ParserSettings, type Types_Pattern as Pattern, type Types_RecoveryStrategy as RecoveryStrategy, Types_Result as Result, type Types_Rule as Rule, type Types_Rules as Rules, type Types_Span as Span, type Types_Token as Token };
-}
-
 declare function parse(tokens: Token[], rules: Rules, settings?: ParserSettings): ParseResult;
 declare const createRule: (name: string, pattern: Pattern, options?: Rule["options"]) => Rule;
 declare function token(name: string, value?: string): Pattern;
@@ -309,4 +282,4 @@ declare const errorRecoveryStrategies: {
     skipUntil(tokens: string | string[]): RecoveryStrategy;
 };
 
-export { Parser, Types, choice, createRule, error, errorRecoveryStrategies, loud, oneOrMore, optional, parse, repeat, rule, seq, silent, token, zeroOrMore, zeroOrOne };
+export { type BuildFunction, type DebugLevel, ERRORS, type ErrorHandler, type MiniToken, type ParseError, type ParseResult, Parser, type ParserSettings, type Pattern, type RecoveryStrategy, Result, type Rule, type Rules, type Span, type Token, choice, createRule, error, errorRecoveryStrategies, loud, oneOrMore, optional, parse, repeat, rule, seq, silent, token, zeroOrMore, zeroOrOne };

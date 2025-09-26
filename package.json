@@ -1,7 +1,7 @@
 {
 	"name": "@je-es/parser",
-	"version": "0.0.9",
-	"description": "A mechanism for creating grammatical rules..!",
+	"version": "0.1.0",
+	"description": "A mechanism for creating grammatical rules.",
 	"keywords": [ "je-es", "parser", "tool", "convert", "tokens", "ast" ],
 	"license": "MIT",
 	"main": "./dist/parser.js",

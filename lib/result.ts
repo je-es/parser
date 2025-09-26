@@ -78,11 +78,11 @@
 
 
             // Initialization
-            constructor(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Types.Span) {
-                this.status     = status ?? 'unset';
-                this.source     = source ?? null;
-                this.mode       = mode ?? 'unset';
-                this.span       = span ?? { start: -88, end: -88 };
+            constructor(status: ResultStatus, source: ResultSource | null, mode: ResultMode, span: Types.Span) {
+                this.status     = status;
+                this.source     = source;
+                this.mode       = mode;
+                this.span       = span;
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -98,74 +98,67 @@
         // ┌─────────────────────────────── FACTORY ────────────────────────────┐
 
             clone() : Result {
-                const res = new Result(this.status, this.source, this.mode);
+                const res = new Result(this.status, this.source, this.mode, this.span);
                 res.errors = [...this.errors];
                 return res;
             }
 
-            static create(status?: ResultStatus, source?: ResultSource, mode?: ResultMode, span?: Types.Span) : Result {
+            static create(status: ResultStatus, source: ResultSource | null, mode: ResultMode, span: Types.Span) : Result {
                 return new Result(status, source, mode, span);
             }
 
-            static createAsToken(status?: ResultStatus, source?: Types.Token, span?: Types.Span) : Result {
+            static createAsToken(status: ResultStatus, source: Types.Token | null, span: Types.Span) : Result {
                 const newSource : TokenSource = {
                     source_kind : 'token-source',
-                    kind        : source?.kind  ?? 'unknown-token',
+                    kind        : source?.kind ?? 'unset',
                     value       : source?.value ?? undefined,
-                    span        : source?.span  ?? undefined,
+                    span        : span,
                 };
-                return Result.create(status, newSource, 'token', span ?? newSource.span);
+                return Result.create(status, newSource, 'token', span);
             }
 
-            static createAsOptional(status?: ResultStatus, source?: Result, span?: Types.Span) : Result {
+            static createAsOptional(status: ResultStatus, source: Result | null, span: Types.Span) : Result {
                 const newSource : OptionalSource = {
                     source_kind : 'optional-source',
-                    result      : source ?? null
+                    result      : source
                 };
 
-                return Result.create(status, newSource, 'optional', span ?? source?.span);
+                return Result.create(status, newSource, 'optional', span);
             }
 
-            static createAsChoice(status?: ResultStatus, source?: Result, index?: number, span?: Types.Span) : Result {
+            static createAsChoice(status: ResultStatus, source: Result | null, index: number, span: Types.Span) : Result {
                 const newSource : ChoiceSource = {
                     source_kind : 'choice-source',
-                    atIndex     : index  ?? -1,
-                    result      : source ?? null
+                    atIndex     : index,
+                    result      : source
                 };
 
-                return Result.create(status, newSource, 'choice', span ?? source?.span);
+                return Result.create(status, newSource, 'choice', span);
             }
 
-            static createAsRepeat(status?: ResultStatus, source?: Result[], span?: Types.Span) : Result {
+            static createAsRepeat(status: ResultStatus, source: Result[] | null, span: Types.Span) : Result {
                 const newSource : RepeatSource = {
                     source_kind : 'repeat-source',
                     result      : source ?? []
                 };
 
-                const full_span : Types.Span = { start: -9, end: -9 };
-                full_span.start = source && source.length ? source[0].span.start : -8;
-                full_span.end = source && source.length ? source[source.length-1].span.end : -7;
-
-                return Result.create(status, newSource, 'repeat', span ?? full_span);
+                return Result.create(status, newSource, 'repeat', span);
             }
 
-            static createAsSequence(status?: ResultStatus, source?: Result[], span?: Types.Span) : Result {
+            static createAsSequence(status: ResultStatus, source: Result[] | null, span: Types.Span) : Result {
                 const newSource : SequenceSource = {
                     source_kind : 'sequence-source',
                     result      : source ?? []
                 };
 
-                const full_span : Types.Span = { start: -6, end: -6 };
-                full_span.start = source && source.length ? source[0].span.start : -5;
-                full_span.end = source && source.length ? source[source.length-1].span.end : -4;
-                return Result.create(status, newSource, 'seq', span ?? full_span);
+                return Result.create(status, newSource, 'seq', span);
             }
 
-            static createAsCustom(status?: ResultStatus, name?: string, data?: unknown, span?: Types.Span) : Result {
+            static createAsCustom(status: ResultStatus, name: string, data: unknown, span: Types.Span) : Result {
                 const newSource : CustomSource = {
                     source_kind : 'custom-source',
-                    tag        : name ?? '',
-                    data        : data ?? null
+                    tag         : name,
+                    data        : data,
                 };
 
                 return Result.create(status, newSource, 'custom', span);
