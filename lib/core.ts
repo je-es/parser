@@ -742,7 +742,7 @@
             private safeBuild(buildFn: Types.BuildFunction, matches: Result): Result {
                 try {
                     // To fix -88 result span issue
-                    const tempRes = buildFn(matches);
+                    const tempRes = buildFn(matches, this);
 
                     if(tempRes.span && (tempRes.span.start === -88 || tempRes.span.end === -88)) {
                         console.warn(`⚠️ -88 result span issue: ${JSON.stringify(tempRes, null, 2)}`);
@@ -1164,7 +1164,19 @@
                         // Keep the earlier error by discarding the new one
                         return;
                     }
-                }                if (error.span) {
+                }
+
+                // Check for errors with same startIndex and keep only the first one
+                const sameStartIndexError = this.errors.find(e =>
+                    e.startIndex === error.startIndex
+                );
+
+                if (sameStartIndexError) {
+                    // Keep the first error with this startIndex by discarding the new one
+                    return;
+                }
+
+                if (error.span) {
                     // First check for exact span matches (keeping older ones)
                     const hasExactSpanMatch = this.errors.some(e =>
                         e.span && error.span &&

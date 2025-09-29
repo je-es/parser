@@ -57,7 +57,7 @@
         token?          : string;
     }
 
-    export type BuildFunction = (matches: Result) => Result;
+    export type BuildFunction = (matches: Result, parser: Parser) => Result;
 
     export interface Rule {
         name            : string;

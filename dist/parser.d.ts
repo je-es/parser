@@ -195,7 +195,7 @@ interface RecoveryStrategy {
     tokens?: string[];
     token?: string;
 }
-type BuildFunction = (matches: Result) => Result;
+type BuildFunction = (matches: Result, parser: Parser) => Result;
 interface Rule {
     name: string;
     pattern: Pattern;

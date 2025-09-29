@@ -808,7 +808,7 @@ var Parser = class _Parser {
   }
   safeBuild(buildFn, matches) {
     try {
-      const tempRes = buildFn(matches);
+      const tempRes = buildFn(matches, this);
       if (tempRes.span && (tempRes.span.start === -88 || tempRes.span.end === -88)) {
         console.warn(`\u26A0\uFE0F -88 result span issue: ${JSON.stringify(tempRes, null, 2)}`);
       }
@@ -1169,6 +1169,12 @@ var Parser = class _Parser {
       if (error2.span && duplicateError.span) {
         return;
       }
+    }
+    const sameStartIndexError = this.errors.find(
+      (e) => e.startIndex === error2.startIndex
+    );
+    if (sameStartIndexError) {
+      return;
     }
     if (error2.span) {
       const hasExactSpanMatch = this.errors.some(
