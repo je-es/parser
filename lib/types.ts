@@ -92,7 +92,7 @@
         span            : Span;
         failedAt        : number;
         tokenIndex      : number;
-        startIndex      : number;      // The index where the pattern started processing before encountering the error
+        startIndex      : number;
         prevRule        : string;
         prevInnerRule?  : string;
     }

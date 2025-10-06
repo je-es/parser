@@ -741,19 +741,12 @@
 
             private safeBuild(buildFn: Types.BuildFunction, matches: Result): Result {
                 try {
-                    // To fix -88 result span issue
-                    const tempRes = buildFn(matches, this);
-
-                    if(tempRes.span && (tempRes.span.start === -88 || tempRes.span.end === -88)) {
-                        console.warn(`⚠️ -88 result span issue: ${JSON.stringify(tempRes, null, 2)}`);
-                    }
-
-                    return tempRes;
+                    return buildFn(matches, this);
                 } catch (error) {
-                    // log if fetal error like : Cannot set properties of undefined (reading/setting 'xxx'), ..
-                    if(error instanceof TypeError || error instanceof ReferenceError) {
-                        console.error(`Build function error in rule '${this.lastHandledRule}':`, error);
-                    }
+                    // // log if fetal error like : Cannot set properties of undefined (reading/setting 'xxx'), ..
+                    // if(error instanceof TypeError || error instanceof ReferenceError) {
+                    //     console.error(`Build function error in rule '${this.lastHandledRule}':`, error);
+                    // }
 
                     if (!this.isInSilentMode()) {
                         const isParseError = (error as Types.ParseError).span !== undefined;
@@ -770,10 +763,11 @@
                         this.log('errors', `Build error: ${(error as Error).message}`);
                     }
 
+                    // NOTE:
+                    // if `matches.status === 'failed'`
+                    // this will stop what I call "Magnetic bubbles"
+
                     // default to returning first match if build fails
-                    // matches.status = 'failed';
-                    // لو خلّيناها failed,
-                    // ده هيتسبب في منع إكتشاف ما أسميه بالـ Magnetic bubbles !
                     return matches;
                 }
             }
@@ -1028,7 +1022,6 @@
             }
 
             isPrevRule(name: string): boolean {
-                console.warn(`isPrevRule: ${JSON.stringify(this.lastHandledRule, null, 2)}`);
                 return this.lastHandledRule === name;
             }
 
@@ -1076,7 +1069,7 @@
 
                             matches = errorHandler.cond(this, opt);
                         } catch (err) {
-                            console.error('Error in condition function:', err);
+                            // console.error('Error in condition function:', err);
                             matches = false;
                         }
                     }
@@ -1305,7 +1298,7 @@
                             };
                             matches = errorHandler.cond(this, opt);
                         } catch (err) {
-                            console.error('Error in condition function:', err);
+                            // console.error('Error in condition function:', err);
                             matches = false;
                         }
                     }
@@ -1355,7 +1348,6 @@
 
                 if (messageIndex <= currentIndex) {
                     const prefix = this.getDebugPrefix(level);
-                    console.log(`${prefix} ${message}`);
                 }
             }
 

@@ -848,15 +848,8 @@ var Parser = class _Parser {
   }
   safeBuild(buildFn, matches) {
     try {
-      const tempRes = buildFn(matches, this);
-      if (tempRes.span && (tempRes.span.start === -88 || tempRes.span.end === -88)) {
-        console.warn(`\u26A0\uFE0F -88 result span issue: ${JSON.stringify(tempRes, null, 2)}`);
-      }
-      return tempRes;
+      return buildFn(matches, this);
     } catch (error2) {
-      if (error2 instanceof TypeError || error2 instanceof ReferenceError) {
-        console.error(`Build function error in rule '${this.lastHandledRule}':`, error2);
-      }
       if (!this.isInSilentMode()) {
         const isParseError = error2.span !== void 0;
         const buildError = this.createError(
@@ -1097,7 +1090,6 @@ var Parser = class _Parser {
     return false;
   }
   isPrevRule(name) {
-    console.warn(`isPrevRule: ${JSON.stringify(this.lastHandledRule, null, 2)}`);
     return this.lastHandledRule === name;
   }
   // └────────────────────────────────────────────────────────────────────┘
@@ -1141,7 +1133,6 @@ var Parser = class _Parser {
           };
           matches = errorHandler.cond(this, opt);
         } catch (err) {
-          console.error("Error in condition function:", err);
           matches = false;
         }
       }
@@ -1321,7 +1312,6 @@ var Parser = class _Parser {
           };
           matches = errorHandler.cond(this, opt);
         } catch (err) {
-          console.error("Error in condition function:", err);
           matches = false;
         }
       }
@@ -1363,7 +1353,6 @@ var Parser = class _Parser {
     const messageIndex = levels.indexOf(level);
     if (messageIndex <= currentIndex) {
       const prefix = this.getDebugPrefix(level);
-      console.log(`${prefix} ${message}`);
     }
   }
   getDebugPrefix(level) {
