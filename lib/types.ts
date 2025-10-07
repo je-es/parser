@@ -8,7 +8,7 @@
 
     import { Parser } from './core';
     import { Result } from './result';
-    
+
     export { Result };
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝

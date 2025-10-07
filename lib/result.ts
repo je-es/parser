@@ -88,20 +88,7 @@
         // └────────────────────────────────────────────────────────────────────┘
 
 
-        // ┌──────────────────────────────── MAIN ──────────────────────────────┐
-
-
-
-        // └────────────────────────────────────────────────────────────────────┘
-
-
         // ┌─────────────────────────────── FACTORY ────────────────────────────┐
-
-            clone() : Result {
-                const res = new Result(this.status, this.source, this.mode, this.span);
-                res.errors = [...this.errors];
-                return res;
-            }
 
             static create(status: ResultStatus, source: ResultSource | null, mode: ResultMode, span: Types.Span) : Result {
                 return new Result(status, source, mode, span);
@@ -162,11 +149,6 @@
                 };
 
                 return Result.create(status, newSource, 'custom', span);
-            }
-
-            withError(err: Types.ParseError) : Result {
-                this.errors.push(err);
-                return this;
             }
 
         // └────────────────────────────────────────────────────────────────────┘
@@ -340,8 +322,19 @@
 
         // ┌──────────────────────────────── HELP ──────────────────────────────┐
 
+            clone() : Result {
+                const res = new Result(this.status, this.source, this.mode, this.span);
+                res.errors = [...this.errors];
+                return res;
+            }
+
             hasErrors() : boolean {
                 return this.errors.length > 0;
+            }
+
+            withError(err: Types.ParseError) : Result {
+                this.errors.push(err);
+                return this;
             }
 
         // └────────────────────────────────────────────────────────────────────┘

@@ -1,4 +1,4 @@
-// .test.ts
+// parser.test.ts
 //
 // Developed with ❤️ by Maysara.
 
@@ -500,6 +500,12 @@
             });
         });
 
+    });
+
+    describe("ComprehensiveTests", () => {
+        it("Already tested in the `@kemet-lang/rules` package", () => {
+            expect(true).toBe(true);
+        });
     });
 
 // ╚══════════════════════════════════════════════════════════════════════════════════════╝
