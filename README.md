@@ -38,37 +38,60 @@ npm install @je-es/parser
 
 ```ts
 // import using typescript
-import { parse } from "@je-es/parser";
+import * as Parser from "@je-es/parser";
 
 // usage
-const result = parse(tokens, rules, settings);
+const result = Parser.parse(tokens, rules, settings);
 ```
 
-> Example:
+> Rules Example using [@je-es/ast](#) library:
 
-```bash
-┌─────────────────────────────────────────────────────────┐
-│     ┌───────┬───────┬─────────┬─────────┬─────────┐     │
-│     │ let   │ x     │  =      │ 42      │ ;       │     │
-│     │ kw    │ ident │  op     │ number  │ punct   │     │
-│     │ 0-3   │ 4-5   │  6-7    │ 8-10    │ 11-12   │     │
-│     └───────┴───────┴─────────┴─────────┴─────────┘     │
-└─────────────────────────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────┐
-│                         PARSING                         │
-└─────────────────────────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────┐
-│ {                                                       │
-│   type: "VariableDeclaration",                          │
-│   name: "x",                                            │
-│   value: 42,                                            │
-│   ...                                                   │
-│ }                                                       │
-└─────────────────────────────────────────────────────────┘
+```ts
+// real example from `@kemet-lang/rules`
+
+const parserRules : Parser.Rules = [
+
+    Parser.createRule('Root',
+        Parser.oneOrMore(Parser.rule('Stmt')),
+        {
+            build: (data: Parser.Result) => {
+                const arr   = data.getRepeatResult()!;
+                const stmts = arr.map((x) => x.getCustomData()! as AST.StmtNode);
+                return Parser.Result.createAsCustom('passed', 'root', stmts, data.span);
+            }
+        }
+    ),
+
+    Parser.createRule('Ident',
+        Parser.token('ident'),
+        {
+            build: (data: Parser.Result) => {
+                const identResult = data.getTokenData()!;
+
+                return Parser.Result.createAsCustom('passed', 'ident',
+                    AST.IdentNode.create( identResult.span, identResult.value!, false),
+                    data.span
+                );
+            },
+
+            errors: [ Parser.error(0, "Expected identifier") ]
+        }
+    ),
+
+    // Include required rules
+    ...Type,
+    ...Expr,
+    ...Stmt,
+];
+
+const parserSettings : Parser.ParserSettings = {
+    startRule       : 'Root',
+    errorRecovery   : { mode: 'resilient', maxErrors: 99 },
+    ignored         : ['ws', 'comment'],
+    debug           : 'off',
+    maxDepth        : 9999,
+    maxCacheSize    : 1024, // 1GB
+};
 ```
 
 ---
@@ -111,7 +134,7 @@ const result = parse(tokens, rules, settings);
 <br>
 <div align="center">
     <a href="https://github.com/maysara-elshewehy">
-        <img src="https://img.shields.io/badge/Made with ❤️ by-Maysara-orange"/>
+        <img src="https://img.shields.io/badge/Made with ❤️ by-Maysara-blue"/>
     </a>
 </div>
 
