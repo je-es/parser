@@ -29,7 +29,7 @@
 
 ## [2] [`@je-es/parser`](https://github.com/je-es/parser) 🚀
 
-> _To understand the full context, please refer to [these documents](https://github.com/kemet-lang/.github/blob/main/profile/README.md)._
+> _To understand the full context, please refer to [this document](https://github.com/kemet-lang/)._
 
 - ### Install
 
