@@ -75,14 +75,7 @@ var Result = class _Result {
     this.span = span;
   }
   // └────────────────────────────────────────────────────────────────────┘
-  // ┌──────────────────────────────── MAIN ──────────────────────────────┐
-  // └────────────────────────────────────────────────────────────────────┘
   // ┌─────────────────────────────── FACTORY ────────────────────────────┐
-  clone() {
-    const res = new _Result(this.status, this.source, this.mode, this.span);
-    res.errors = [...this.errors];
-    return res;
-  }
   static create(status, source, mode, span) {
     return new _Result(status, source, mode, span);
   }
@@ -132,10 +125,6 @@ var Result = class _Result {
       data
     };
     return _Result.create(status, newSource, "custom", span);
-  }
-  withError(err) {
-    this.errors.push(err);
-    return this;
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌──────────────────────────────── IS_X ──────────────────────────────┐
@@ -262,8 +251,17 @@ var Result = class _Result {
   }
   // └────────────────────────────────────────────────────────────────────┘
   // ┌──────────────────────────────── HELP ──────────────────────────────┐
+  clone() {
+    const res = new _Result(this.status, this.source, this.mode, this.span);
+    res.errors = [...this.errors];
+    return res;
+  }
   hasErrors() {
     return this.errors.length > 0;
+  }
+  withError(err) {
+    this.errors.push(err);
+    return this;
   }
   // └────────────────────────────────────────────────────────────────────┘
 };

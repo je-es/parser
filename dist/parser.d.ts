@@ -36,7 +36,6 @@ declare class Result {
     mode: ResultMode;
     errors: ParseError[];
     constructor(status: ResultStatus, source: ResultSource | null, mode: ResultMode, span: Span);
-    clone(): Result;
     static create(status: ResultStatus, source: ResultSource | null, mode: ResultMode, span: Span): Result;
     static createAsToken(status: ResultStatus, source: Token | null, span: Span): Result;
     static createAsOptional(status: ResultStatus, source: Result | null, span: Span): Result;
@@ -44,7 +43,6 @@ declare class Result {
     static createAsRepeat(status: ResultStatus, source: Result[] | null, span: Span): Result;
     static createAsSequence(status: ResultStatus, source: Result[] | null, span: Span): Result;
     static createAsCustom(status: ResultStatus, name: string, data: unknown, span: Span): Result;
-    withError(err: ParseError): Result;
     isPassed(): boolean;
     isFullyPassed(): boolean;
     isFailed(): boolean;
@@ -68,7 +66,9 @@ declare class Result {
     getSequenceCount(): number | undefined;
     getSequenceResult(): Result[] | undefined;
     getCustomData(): unknown | undefined;
+    clone(): Result;
     hasErrors(): boolean;
+    withError(err: ParseError): Result;
 }
 
 declare class Parser {

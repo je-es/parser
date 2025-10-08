@@ -31,68 +31,76 @@
 
 > _To understand the full context, please refer to [these documents](https://github.com/kemet-lang/.github/blob/main/profile/README.md)._
 
-```bash
-# install using npm
-npm install @je-es/parser
-```
+- ### Install
 
-```ts
-// import using typescript
-import * as Parser from "@je-es/parser";
+    ```bash
+    npm install @je-es/parser
+    ```
 
-// usage
-const result = Parser.parse(tokens, rules, settings);
-```
+    ```ts
+    import * as Parser from "@je-es/parser";
+    ```
 
-> Rules Example using [@je-es/ast](#) library:
+- ### Usage
 
-```ts
-// real example from `@kemet-lang/rules`
+    > real example from `@kemet-lang/rules`
 
-const parserRules : Parser.Rules = [
+    ```ts
+    // [1] create parser rules
+    const parser_rules : Parser.Rules = [
 
-    Parser.createRule('Root',
-        Parser.oneOrMore(Parser.rule('Stmt')),
-        {
-            build: (data: Parser.Result) => {
-                const arr   = data.getRepeatResult()!;
-                const stmts = arr.map((x) => x.getCustomData()! as AST.StmtNode);
-                return Parser.Result.createAsCustom('passed', 'root', stmts, data.span);
+        Parser.createRule('Root',
+            Parser.oneOrMore(Parser.rule('Stmt')),
+            {
+                build: (data: Parser.Result) => {
+                    const arr   = data.getRepeatResult()!;
+                    const stmts = arr.map((x) => x.getCustomData()! as AST.StmtNode);
+                    return Parser.Result.createAsCustom('passed', 'root', stmts, data.span);
+                }
             }
-        }
-    ),
+        ),
 
-    Parser.createRule('Ident',
-        Parser.token('ident'),
-        {
-            build: (data: Parser.Result) => {
-                const identResult = data.getTokenData()!;
+        Parser.createRule('Ident',
+            Parser.token('ident'),
+            {
+                build: (data: Parser.Result) => {
+                    const identResult = data.getTokenData()!;
 
-                return Parser.Result.createAsCustom('passed', 'ident',
-                    AST.IdentNode.create( identResult.span, identResult.value!, false),
-                    data.span
-                );
-            },
+                    return Parser.Result.createAsCustom('passed', 'ident',
+                        AST.IdentNode.create( identResult.span, identResult.value!, false),
+                        data.span
+                    );
+                },
 
-            errors: [ Parser.error(0, "Expected identifier") ]
-        }
-    ),
+                errors: [ Parser.error(0, "Expected identifier") ]
+            }
+        ),
 
-    // Include required rules
-    ...Type,
-    ...Expr,
-    ...Stmt,
-];
+        // Include required rules
+        ...Type,
+        ...Expr,
+        ...Stmt,
+    ];
+    ```
 
-const parserSettings : Parser.ParserSettings = {
-    startRule       : 'Root',
-    errorRecovery   : { mode: 'resilient', maxErrors: 99 },
-    ignored         : ['ws', 'comment'],
-    debug           : 'off',
-    maxDepth        : 9999,
-    maxCacheSize    : 1024, // 1GB
-};
-```
+    ```ts
+    // [2] create parser settings
+    const parser_settings : Parser.ParserSettings = {
+        startRule       : 'Root',
+        errorRecovery   : { mode: 'resilient', maxErrors: 99 },
+        ignored         : ['ws', 'comment'],
+        debug           : 'off',
+        maxDepth        : 9999,
+        maxCacheSize    : 1024, // 1GB
+    };
+    ```
+
+    ```ts
+    // [3] parse tokens using your rules
+    const parser_result = Parser.parse([<tokens>], parser_rules, parser_settings);
+
+    // Hint: to get tokens use `@je-es/lexer`
+    ```
 
 ---
 
