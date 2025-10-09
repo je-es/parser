@@ -53,7 +53,7 @@
     export interface CustomSource {
         source_kind     : 'custom-source',
 
-        tag             : string;
+        name            : string;
         data            : unknown;
     }
 
@@ -144,7 +144,7 @@
             static createAsCustom(status: ResultStatus, name: string, data: unknown, span: Types.Span) : Result {
                 const newSource : CustomSource = {
                     source_kind : 'custom-source',
-                    tag         : name,
+                    name         : name,
                     data        : data,
                 };
 
@@ -201,7 +201,7 @@
             isCustom(tag?: string) : boolean {
                 if(this.mode === 'custom') {
                     if(tag) {
-                        return (this.source as CustomSource).tag == tag;
+                        return (this.source as CustomSource).name == tag;
                     } else return true;
                 }
 
@@ -312,6 +312,14 @@
             getCustomData() : unknown | undefined {
                 if(this.isCustom()) {
                     return (this.source as CustomSource).data;
+                }
+
+                return undefined;
+            }
+
+            getCustomName() : string | undefined {
+                if(this.isCustom()) {
+                    return (this.source as CustomSource).name;
                 }
 
                 return undefined;

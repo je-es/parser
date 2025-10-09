@@ -25,7 +25,7 @@ interface SequenceSource {
 }
 interface CustomSource {
     source_kind: 'custom-source';
-    tag: string;
+    name: string;
     data: unknown;
 }
 type ResultSource = TokenSource | OptionalSource | ChoiceSource | RepeatSource | SequenceSource | CustomSource | null;
@@ -66,6 +66,7 @@ declare class Result {
     getSequenceCount(): number | undefined;
     getSequenceResult(): Result[] | undefined;
     getCustomData(): unknown | undefined;
+    getCustomName(): string | undefined;
     clone(): Result;
     hasErrors(): boolean;
     withError(err: ParseError): Result;

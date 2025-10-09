@@ -81,7 +81,7 @@ var Result = class _Result {
   static createAsCustom(status, name, data, span) {
     const newSource = {
       source_kind: "custom-source",
-      tag: name,
+      name,
       data
     };
     return _Result.create(status, newSource, "custom", span);
@@ -123,7 +123,7 @@ var Result = class _Result {
   isCustom(tag) {
     if (this.mode === "custom") {
       if (tag) {
-        return this.source.tag == tag;
+        return this.source.name == tag;
       } else return true;
     }
     return false;
@@ -206,6 +206,12 @@ var Result = class _Result {
   getCustomData() {
     if (this.isCustom()) {
       return this.source.data;
+    }
+    return void 0;
+  }
+  getCustomName() {
+    if (this.isCustom()) {
+      return this.source.name;
     }
     return void 0;
   }
