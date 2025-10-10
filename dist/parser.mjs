@@ -685,11 +685,11 @@ var Parser = class _Parser {
     while (results.length < max && this.index < this.tokens.length) {
       const iterationStart = this.index;
       const savedErrors = [...this.errors];
-      isEndsWithSep = false;
       try {
         const result = this.parsePattern(pattern, parentRule);
         if (!result.isFullyPassed()) {
           this.errors = savedErrors;
+          isEndsWithSep = false;
           if (results.length >= min) {
             break;
           } else if (shouldBeSilent || pattern.silent) {
@@ -743,6 +743,7 @@ var Parser = class _Parser {
           break;
         }
         if (shouldBeSilent || results.length >= min) {
+          isEndsWithSep = false;
           break;
         }
         throw e;

@@ -147,12 +147,12 @@
                         consecutiveErrors++;
 
                         const parseError = this.normalizeError(error, this.getCurrentSpan());
-                        
+
                         // Don't add errors from failed attempts when in strict mode after successful parse
                         if (this.settings.errorRecovery!.mode === 'strict' && this.ast.length > 0) {
                             break;
                         }
-                        
+
                         this.addError(parseError);
 
                         if (this.settings.errorRecovery!.mode === 'resilient') {
@@ -171,7 +171,7 @@
                     }
 
                     this.skipIgnored();
-                    
+
                     // If skipIgnored didn't move us and we've successfully parsed something, we're done
                     if (this.index === beforeIndex && this.ast.length > 0) {
                         break;
@@ -569,16 +569,14 @@
                 while (results.length < max && this.index < this.tokens.length) {
                     const iterationStart = this.index;
                     const savedErrors = [...this.errors];
-                    isEndsWithSep = false;
 
                     try {
                         const result = this.parsePattern(pattern, parentRule);
 
                         if (!result.isFullyPassed()) {
                             this.errors = savedErrors;
+                            isEndsWithSep = false;
 
-                            // If we have enough results and we're here after a separator,
-                            // that means the separator was trailing - this is OK
                             if (results.length >= min) {
                                 break;
                             } else if (shouldBeSilent || pattern.silent) {
@@ -639,12 +637,12 @@
                         // If we just parsed a separator and now failed on the pattern,
                         // and we have enough elements, this is a trailing separator case
                         if (isEndsWithSep && results.length >= min) {
-                            // DON'T reset isEndsWithSep - we genuinely ended with separator
-                            // isEndsWithSep = false;  // ← REMOVE THIS LINE
+                            // Keep isEndsWithSep = true because we genuinely ended with separator
                             break;
                         }
 
                         if (shouldBeSilent || results.length >= min) {
+                            isEndsWithSep = false;
                             break;
                         }
 
