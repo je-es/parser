@@ -370,7 +370,7 @@
             ];
 
             test("should parse repeat correctly", () => {
-                const input = '7, 8';
+                const input = '7, 8,';
                 const tokens = lexer.tokenize(input, tokensRules);
                 const res = parser.parse(tokens, parserRules, parserSettings);
                 // console.log(JSON.stringify(res, null ,2));

@@ -123,7 +123,7 @@
 
                 while (this.index < this.tokens.length && (maxErrors === 0 || this.errors.length < maxErrors)) {
                     const beforeIndex = this.index;
-                    this.rootStartIndex = beforeIndex; // Set root start index
+                    this.rootStartIndex = beforeIndex;
 
                     try {
                         const result = this.parsePattern(startRule.pattern, startRule);
@@ -147,18 +147,21 @@
                         consecutiveErrors++;
 
                         const parseError = this.normalizeError(error, this.getCurrentSpan());
+                        
+                        // Don't add errors from failed attempts when in strict mode after successful parse
+                        if (this.settings.errorRecovery!.mode === 'strict' && this.ast.length > 0) {
+                            break;
+                        }
+                        
                         this.addError(parseError);
 
-                        // Better error recovery
                         if (this.settings.errorRecovery!.mode === 'resilient') {
                             this.applyRecovery(startRule, beforeIndex);
 
-                            // Force progress if we're stuck
                             if (this.index === beforeIndex && this.index < this.tokens.length) {
                                 this.index++;
                             }
                         } else {
-                            // In strict mode, stop after first error
                             break;
                         }
 
@@ -168,6 +171,11 @@
                     }
 
                     this.skipIgnored();
+                    
+                    // If skipIgnored didn't move us and we've successfully parsed something, we're done
+                    if (this.index === beforeIndex && this.ast.length > 0) {
+                        break;
+                    }
                 }
             }
 
@@ -556,10 +564,12 @@
                 const results : Result[] = [];
                 let consecutiveFailures = 0;
                 const startIndex = this.index;
+                let isEndsWithSep = false;
 
                 while (results.length < max && this.index < this.tokens.length) {
                     const iterationStart = this.index;
                     const savedErrors = [...this.errors];
+                    isEndsWithSep = false;
 
                     try {
                         const result = this.parsePattern(pattern, parentRule);
@@ -567,34 +577,29 @@
                         if (!result.isFullyPassed()) {
                             this.errors = savedErrors;
 
-                            // Better minimum requirement handling
+                            // If we have enough results and we're here after a separator,
+                            // that means the separator was trailing - this is OK
                             if (results.length >= min) {
-                                // We have enough results, break cleanly
                                 break;
                             } else if (shouldBeSilent || pattern.silent) {
-                                // Silent mode - break without error
                                 break;
                             } else {
-                                // Not enough results and not silent - this is an error
                                 consecutiveFailures++;
                                 if (consecutiveFailures > 3) {break;}
 
-                                // Try recovery if we have a recovery strategy
                                 if (parentRule?.options?.recovery) {
                                     this.applyRecovery(parentRule, iterationStart);
                                     if (this.index === iterationStart) {
-                                        this.index++; // Force progress
+                                        this.index++;
                                     }
                                     continue;
                                 } else {
-                                    // No recovery - break and let minimum check handle the error
                                     break;
                                 }
                             }
                         }
 
                         consecutiveFailures = 0;
-
                         results.push(result);
 
                         if (this.index === iterationStart) {
@@ -612,36 +617,45 @@
                                 if (!sepResult.isFullyPassed()) {
                                     this.index  = sepStart;
                                     this.errors = sepSavedErrors;
+                                    isEndsWithSep = false;
                                     break;
                                 }
+                                // Mark that we ended with separator
+                                // The next iteration will determine if there's a following element
+                                isEndsWithSep = true;
                             } catch {
                                 this.index  = sepStart;
                                 this.errors = sepSavedErrors;
+                                isEndsWithSep = false;
                                 break;
                             }
                         }
 
                     } catch (e) {
                         consecutiveFailures++;
-
                         this.index  = iterationStart;
                         this.errors = savedErrors;
+
+                        // If we just parsed a separator and now failed on the pattern,
+                        // and we have enough elements, this is a trailing separator case
+                        if (isEndsWithSep && results.length >= min) {
+                            // Reset isEndsWithSep and break cleanly
+                            isEndsWithSep = false;
+                            break;
+                        }
 
                         if (shouldBeSilent || results.length >= min) {
                             break;
                         }
 
-                        // Let the pattern error propagate up instead of handling it here
-                        // This allows the proper error handling in the calling context
                         throw e;
                     }
                 }
 
-                // Check minimum requirement and create appropriate error
+                // Check minimum requirement
                 if (results.length < min) {
                     if (shouldBeSilent) { return Result.create('failed', null, 'unset', this.getCurrentSpan()); }
 
-                    // Check if we should use a custom error from the parent rule
                     if (parentRule?.options?.errors) {
                         const customError = this.getCustomErrorForCondition(parentRule, 0, this.index, startIndex);
                         if (customError) {
@@ -666,7 +680,8 @@
                 return Result.createAsRepeat('passed', results, results.length ? {
                         start: results[0].span.start,
                         end: results[results.length-1].span.end
-                } : this.getCurrentSpan());
+                } : this.getCurrentSpan(),
+                isEndsWithSep);
             }
 
             private parseSequence(patterns: Types.Pattern[], parentRule?: Types.Rule, shouldBeSilent?: boolean): Result {
@@ -1348,6 +1363,10 @@
 
                 if (messageIndex <= currentIndex) {
                     const prefix = this.getDebugPrefix(level);
+                    const indent = '  '.repeat(this.indentLevel);
+                    console.log(`${prefix} ${indent}${message}`);
+                } else {
+                    console.log(message);
                 }
             }
 

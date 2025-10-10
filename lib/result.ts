@@ -41,6 +41,7 @@
     export interface RepeatSource {
         source_kind     : 'repeat-source',
 
+        endsWithSep     : boolean;
         result          : Result[];
     }
 
@@ -123,9 +124,10 @@
                 return Result.create(status, newSource, 'choice', span);
             }
 
-            static createAsRepeat(status: ResultStatus, source: Result[] | null, span: Types.Span) : Result {
+            static createAsRepeat(status: ResultStatus, source: Result[] | null, span: Types.Span, endsWithSep: boolean = false) : Result {
                 const newSource : RepeatSource = {
                     source_kind : 'repeat-source',
+                    endsWithSep : endsWithSep,
                     result      : source ?? []
                 };
 
@@ -288,6 +290,14 @@
             getRepeatResult() : Result[] | undefined {
                 if(this.isRepeat()) {
                     return (this.source as RepeatSource).result;
+                }
+
+                return undefined;
+            }
+
+            isRepeatEndsWithSep() : boolean | undefined {
+                if(this.isRepeat()) {
+                    return (this.source as RepeatSource).endsWithSep;
                 }
 
                 return undefined;

@@ -104,9 +104,10 @@ var Result = class _Result {
     };
     return _Result.create(status, newSource, "choice", span);
   }
-  static createAsRepeat(status, source, span) {
+  static createAsRepeat(status, source, span, endsWithSep = false) {
     const newSource = {
       source_kind: "repeat-source",
+      endsWithSep,
       result: source != null ? source : []
     };
     return _Result.create(status, newSource, "repeat", span);
@@ -228,6 +229,12 @@ var Result = class _Result {
   getRepeatResult() {
     if (this.isRepeat()) {
       return this.source.result;
+    }
+    return void 0;
+  }
+  isRepeatEndsWithSep() {
+    if (this.isRepeat()) {
+      return this.source.endsWithSep;
     }
     return void 0;
   }
@@ -390,6 +397,9 @@ var Parser = class _Parser {
       } catch (error2) {
         consecutiveErrors++;
         const parseError = this.normalizeError(error2, this.getCurrentSpan());
+        if (this.settings.errorRecovery.mode === "strict" && this.ast.length > 0) {
+          break;
+        }
         this.addError(parseError);
         if (this.settings.errorRecovery.mode === "resilient") {
           this.applyRecovery(startRule, beforeIndex);
@@ -404,6 +414,9 @@ var Parser = class _Parser {
         }
       }
       this.skipIgnored();
+      if (this.index === beforeIndex && this.ast.length > 0) {
+        break;
+      }
     }
   }
   parsePattern(pattern, parentRule) {
@@ -708,9 +721,11 @@ var Parser = class _Parser {
     const results = [];
     let consecutiveFailures = 0;
     const startIndex = this.index;
+    let isEndsWithSep = false;
     while (results.length < max && this.index < this.tokens.length) {
       const iterationStart = this.index;
       const savedErrors = [...this.errors];
+      isEndsWithSep = false;
       try {
         const result = this.parsePattern(pattern, parentRule);
         if (!result.isFullyPassed()) {
@@ -749,11 +764,14 @@ var Parser = class _Parser {
             if (!sepResult.isFullyPassed()) {
               this.index = sepStart;
               this.errors = sepSavedErrors;
+              isEndsWithSep = false;
               break;
             }
+            isEndsWithSep = true;
           } catch (e) {
             this.index = sepStart;
             this.errors = sepSavedErrors;
+            isEndsWithSep = false;
             break;
           }
         }
@@ -761,6 +779,10 @@ var Parser = class _Parser {
         consecutiveFailures++;
         this.index = iterationStart;
         this.errors = savedErrors;
+        if (isEndsWithSep && results.length >= min) {
+          isEndsWithSep = false;
+          break;
+        }
         if (shouldBeSilent || results.length >= min) {
           break;
         }
@@ -788,10 +810,15 @@ var Parser = class _Parser {
       throw error2;
     }
     this.log("verbose", `REPEAT \u2192 [${results.length}] @${this.index}`);
-    return Result.createAsRepeat("passed", results, results.length ? {
-      start: results[0].span.start,
-      end: results[results.length - 1].span.end
-    } : this.getCurrentSpan());
+    return Result.createAsRepeat(
+      "passed",
+      results,
+      results.length ? {
+        start: results[0].span.start,
+        end: results[results.length - 1].span.end
+      } : this.getCurrentSpan(),
+      isEndsWithSep
+    );
   }
   parseSequence(patterns, parentRule, shouldBeSilent) {
     var _a;
@@ -1357,6 +1384,10 @@ var Parser = class _Parser {
     const messageIndex = levels.indexOf(level);
     if (messageIndex <= currentIndex) {
       const prefix = this.getDebugPrefix(level);
+      const indent = "  ".repeat(this.indentLevel);
+      console.log(`${prefix} ${indent}${message}`);
+    } else {
+      console.log(message);
     }
   }
   getDebugPrefix(level) {

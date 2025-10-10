@@ -17,6 +17,7 @@ interface ChoiceSource {
 }
 interface RepeatSource {
     source_kind: 'repeat-source';
+    endsWithSep: boolean;
     result: Result[];
 }
 interface SequenceSource {
@@ -40,7 +41,7 @@ declare class Result {
     static createAsToken(status: ResultStatus, source: Token | null, span: Span): Result;
     static createAsOptional(status: ResultStatus, source: Result | null, span: Span): Result;
     static createAsChoice(status: ResultStatus, source: Result | null, index: number, span: Span): Result;
-    static createAsRepeat(status: ResultStatus, source: Result[] | null, span: Span): Result;
+    static createAsRepeat(status: ResultStatus, source: Result[] | null, span: Span, endsWithSep?: boolean): Result;
     static createAsSequence(status: ResultStatus, source: Result[] | null, span: Span): Result;
     static createAsCustom(status: ResultStatus, name: string, data: unknown, span: Span): Result;
     isPassed(): boolean;
@@ -63,6 +64,7 @@ declare class Result {
     getChoiceResult(): Result | null | undefined;
     getRepeatCount(): number | undefined;
     getRepeatResult(): Result[] | undefined;
+    isRepeatEndsWithSep(): boolean | undefined;
     getSequenceCount(): number | undefined;
     getSequenceResult(): Result[] | undefined;
     getCustomData(): unknown | undefined;
