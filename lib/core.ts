@@ -639,8 +639,8 @@
                         // If we just parsed a separator and now failed on the pattern,
                         // and we have enough elements, this is a trailing separator case
                         if (isEndsWithSep && results.length >= min) {
-                            // Reset isEndsWithSep and break cleanly
-                            isEndsWithSep = false;
+                            // DON'T reset isEndsWithSep - we genuinely ended with separator
+                            // isEndsWithSep = false;  // ← REMOVE THIS LINE
                             break;
                         }
 

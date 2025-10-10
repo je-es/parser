@@ -780,7 +780,6 @@ var Parser = class _Parser {
         this.index = iterationStart;
         this.errors = savedErrors;
         if (isEndsWithSep && results.length >= min) {
-          isEndsWithSep = false;
           break;
         }
         if (shouldBeSilent || results.length >= min) {
