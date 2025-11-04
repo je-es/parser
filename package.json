@@ -1,6 +1,6 @@
 {
 	"name": "@je-es/parser",
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"description": "A robust parser that performs syntactic analysis and constructs an Abstract Syntax Tree (AST).",
 	"keywords": [ "je-es", "parser", "tool", "convert", "tokens", "ast" ],
 	"license": "MIT",
