@@ -1,4 +1,4 @@
-// parser.ts — A mechanism for creating grammatical rules.
+// parser.ts — A robust parser that performs syntactic analysis and constructs an Abstract Syntax Tree (AST).
 //
 // repo   : https://github.com/je-es/parser
 // author : https://github.com/maysara-elshewehy
